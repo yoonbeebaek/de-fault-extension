@@ -1,19 +1,26 @@
-// ─── Constants ───────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+//  De.fault — content.js
+//  De-personalization engine. Reads any page context, intersects
+//  Intent × Content-Type, surfaces 3 unexpected adjacent pieces.
+// ═══════════════════════════════════════════════════════════════
+
+// ─── Copy ──────────────────────────────────────────────────────
 
 const HEADLINES = [
-  "I have something else to show you!",
-  "Shall we explore different perspectives?",
-  "Hey, have you also heard about this?",
-  "Understanding why can also help.",
-  "Wait, have you heard about this?",
-  "Check out their backstory!",
-  "Hope this also motivates you."
+  'I have something else to show you!',
+  'Shall we explore different perspectives?',
+  'Hey, have you also heard about this?',
+  'Understanding why can also help.',
+  'Wait, have you heard about this?',
+  'Check out their backstory!',
+  'Hope this also motivates you.'
 ];
 
+// Intent × Content-Type matrix (8 angles)
 const CONTENT_TYPES = [
   { key: 'cause',        desc: 'the root cause — what caused this topic to exist?' },
   { key: 'effect',       desc: 'downstream consequences — what happens because of this?' },
-  { key: 'opinion',      desc: 'contested opinions — what do people argue about this?' },
+  { key: 'opinion',      desc: 'contested opinions — what do people debate about this?' },
   { key: 'backstory',    desc: 'backstory — what is the historical or origin context?' },
   { key: 'adjacent',     desc: 'adjacent topics — what lives conceptually next to this?' },
   { key: 'alternative',  desc: 'alternative angles — a completely different way of looking at this' },
@@ -21,596 +28,684 @@ const CONTENT_TYPES = [
   { key: 'examples',     desc: 'illustrative examples — concrete real-world cases that show this in action' }
 ];
 
-// Discipline colors: Blue=Linguistic, Red=Economic, Green=Biological
-const SESSION_COLORS = ['#001FE9', '#F90000', '#004500'];
+// Card palette from tokens.css — all entries safe for white fg-1 text
+const SESSION_COLORS = [
+  'rgb(142,30,30)',   // --red-1
+  'rgb(118,57,64)',   // --red-3
+  'rgb(0,70,189)',    // --blue-1
+  'rgb(9,50,122)',    // --blue-2
+  'rgb(1,55,147)',    // --blue-3
+  'rgb(60,72,103)',   // --blue-4
+  'rgb(0,67,116)',    // --blue-5
+  'rgb(0,118,50)',    // --green-1
+  'rgb(5,90,18)',     // --green-3
+  'rgb(35,80,61)',    // --green-4
+  'rgb(45,78,6)',     // --green-5
+  'rgb(1,90,95)',     // --teal-1
+  'rgb(67,126,140)',  // --teal-2
+  'rgb(159,2,143)',   // --magenta
+  'rgb(164,72,20)',   // --orange-1
+  'rgb(87,61,36)',    // --brown-1
+  'rgb(88,88,88)',    // --slate-1
+  'rgb(65,64,63)'     // --slate-2
+];
 
-// ─── Page Context Detection ───────────────────────────────────────────────────
+// ─── Page Context — works on any page with detectable text ─────
 
 function getPageContext() {
-  const url = window.location.href;
+  const url  = window.location.href;
+  const host = window.location.hostname;
 
-  // Skip non-content pages
-  const skipPatterns = [
-    /^chrome(-extension)?:\/\//,
-    /^about:/,
-    /^moz-extension:\/\//,
-    /\.(pdf|xml|json)(\?|$)/i
-  ];
-  if (skipPatterns.some(p => p.test(url))) return null;
+  // Skip browser-internal and non-HTML pages
+  if (/^(chrome|chrome-extension|moz-extension|edge|brave|about|data|file|blob):/.test(url)) return null;
+  if (/^(localhost|127\.|0\.0\.0\.0)/.test(host)) return null;
+  if (/\.(pdf|xml|json|csv|txt)(\?.*)?$/i.test(url)) return null;
 
-  // Google Search
-  if (window.location.hostname.includes('google.') && window.location.pathname === '/search') {
+  // 1. Google Search — most reliable signal
+  if (/google\.[a-z.]+\/search/.test(url)) {
     const q = new URLSearchParams(window.location.search).get('q');
-    if (q && q.trim().length >= 3) return { context: q.trim(), source: 'search' };
-    return null;
+    if (q?.trim().length >= 3) return { context: q.trim(), source: 'search' };
   }
 
-  // Article page — require a meaningful h1
-  const h1 = document.querySelector('h1');
-  if (h1) {
-    const text = h1.textContent.trim();
-    if (text.length >= 15) return { context: text.substring(0, 200), source: 'article' };
+  // 2. YouTube video
+  if (host.includes('youtube.com') && url.includes('/watch')) {
+    const clean = document.title?.replace(/\s*-\s*YouTube\s*$/, '').trim();
+    if (clean?.length > 4) return { context: clean, source: 'youtube' };
   }
+
+  // 3. Twitter / X
+  if (host.includes('twitter.com') || host.includes('x.com')) {
+    const tweet = document.querySelector('[data-testid="tweetText"]');
+    if (tweet?.textContent.trim().length > 10)
+      return { context: tweet.textContent.trim().slice(0, 200), source: 'twitter' };
+  }
+
+  // 4. Reddit — handles both old and new Reddit
+  if (host.includes('reddit.com')) {
+    const el = document.querySelector(
+      'h1[data-testid="post-title"], shreddit-post h1, [data-click-id="title"] h3, h1.title'
+    );
+    if (el?.textContent.trim().length > 5)
+      return { context: el.textContent.trim().slice(0, 200), source: 'reddit' };
+  }
+
+  // 5. Wikipedia
+  if (host.includes('wikipedia.org')) {
+    const h1 = document.querySelector('#firstHeading');
+    if (h1?.textContent.trim()) return { context: h1.textContent.trim(), source: 'wikipedia' };
+  }
+
+  // 6. Any article — prefer article > main scoped h1
+  const h1 = document.querySelector('article h1, main h1, h1');
+  if (h1?.textContent.trim().length >= 15)
+    return { context: h1.textContent.trim().slice(0, 200), source: 'article' };
+
+  // 7. Open Graph title (content-focused, usually cleaner than <title>)
+  const og = document.querySelector('meta[property="og:title"]')?.content?.trim();
+  if (og?.length >= 10) return { context: og.slice(0, 200), source: 'og' };
+
+  // 8. Page <title> — strip common " | Site Name" suffixes
+  const raw = document.title?.trim();
+  if (raw?.length >= 10) {
+    const clean = raw
+      .replace(/\s*[-–—|·•]\s*[^-–—|·•]{1,50}$/, '')
+      .replace(/\s*[-–—|·•]\s*[^-–—|·•]{1,50}$/, '')
+      .trim();
+    if (clean.length >= 8) return { context: clean, source: 'title' };
+    return { context: raw.slice(0, 200), source: 'title' };
+  }
+
+  // 9. Meta description fallback
+  const desc = document.querySelector('meta[name="description"], meta[property="og:description"]')?.content?.trim();
+  if (desc?.length >= 20) return { context: desc.slice(0, 200), source: 'meta' };
 
   return null;
 }
 
-// ─── Intent Detection (Intent × Content Matrix) ──────────────────────────────
+// ─── Intent Detection ──────────────────────────────────────────
 
 function detectIntent(text) {
   const t = text.toLowerCase();
+  const has = (re) => re.test(t);
 
-  const isGoalAction = /\b(how to|how do i|how do you|how can i|fix|repair|install|setup|configure|download|buy|purchase|order|find|get|make|create|build|start|stop|add|remove|enable|disable)\b/.test(t);
-  const isDecision   = /\b(compare|vs\.?|versus|review|reviews|best|top|cheapest|which|should i|recommend|worth it|difference between|pros and cons|is it worth)\b/.test(t);
-  const isLearning   = /\b(what is|what are|what was|what were|explain|definition|meaning of|understand|why is|why does|why did|how does|how did|what does|when did|where did|who is|who was|overview|introduction to|history of|science of)\b/.test(t);
-  const isBeginner   = /\b(beginner|basics|introduction|intro|start|starter|learn|fundamentals|guide|101|for dummies|explained simply|easy)\b/.test(t);
-  const isEntertain  = /\b(funny|humor|comedy|hilarious|meme|memes|weird|strange|shocking|amazing|incredible|beautiful|sad|emotional|touching|scary|horror|thriller|movie|film|tv show|series|music|song|album|playlist|game|gaming|celebrity|gossip|viral|trending|wtf)\b/.test(t);
-  const isEscape     = /\b(relax|chill|escape|hobby|fun|entertainment|watch|listen|play|pass the time|bored|something to do)\b/.test(t);
-  const isTrend      = /\b(trend|trending|news|latest|new|recent|2024|2025|2026|future|emerging|innovation|startup|technology|ai|artificial intelligence|breakthrough|update)\b/.test(t);
+  if (has(/\b(how to|how do i|how can i|fix|repair|install|setup|configure|download|buy|purchase|find|make|create|build|remove|enable|disable)\b/)) {
+    return has(/\b(compare|vs\.?|versus|review|best|top|which|should i|recommend|worth|difference between|pros and cons)\b/)
+      ? "I'm here to dig deeper and decide"
+      : "I'm here to get something done";
+  }
 
-  if (isGoalAction && isDecision) return "I'm here to dig deeper and decide";
-  if (isGoalAction)               return "I'm here to get something done";
-  if (isLearning && isBeginner)   return "I'm building knowledge from scratch";
-  if (isLearning)                 return "I'm aiming for full comprehension";
-  if (isEntertain && isEscape)    return "I want to relax / escape";
-  if (isEntertain)                return "I want to feel something (funny, emotional, weird)";
-  if (isTrend)                    return "I'm browsing for emerging trends and perspectives";
+  if (has(/\b(what is|what are|explain|definition|meaning|understand|why is|why does|how does|overview|history of|science of|who is|who was)\b/)) {
+    return has(/\b(beginner|basics|introduction|intro|start|fundamentals|guide|101|for dummies|explained simply)\b/)
+      ? "I'm building knowledge from scratch"
+      : "I'm aiming for full comprehension";
+  }
+
+  if (has(/\b(funny|humor|comedy|hilarious|meme|weird|strange|shocking|amazing|beautiful|sad|emotional|movie|film|music|song|game|gaming|celebrity|gossip|viral)\b/)) {
+    return has(/\b(relax|chill|escape|hobby|entertainment|watch|listen|play|bored)\b/)
+      ? "I want to relax / escape"
+      : "I want to feel something (funny, emotional, weird)";
+  }
+
+  if (has(/\b(trend|trending|news|latest|new|recent|2024|2025|2026|future|emerging|innovation|startup|ai|artificial intelligence|breakthrough)\b/))
+    return "I'm browsing for emerging trends and perspectives";
+
   return "I'm open to discovery";
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Session State ─────────────────────────────────────────────
 
-function hashString(str) {
-  let h = 0;
-  for (let i = 0; i < str.length; i++) {
-    h = Math.imul(31, h) + str.charCodeAt(i) | 0;
+const SK = { color: 'df-ci', ct: 'df-cti', hl: 'df-hl' };
+
+function initSession() {
+  let ci = sessionStorage.getItem(SK.color);
+  if (ci === null) {
+    ci = Math.floor(Math.random() * SESSION_COLORS.length);
+    sessionStorage.setItem(SK.color, ci);
   }
-  return Math.abs(h) % 900 + 100; // 100–999
+  let cti = sessionStorage.getItem(SK.ct);
+  if (cti === null) {
+    cti = Math.floor(Math.random() * CONTENT_TYPES.length);
+    sessionStorage.setItem(SK.ct, cti);
+  }
+  let hl = sessionStorage.getItem(SK.hl);
+  if (!hl) {
+    hl = HEADLINES[Math.floor(Math.random() * HEADLINES.length)];
+    sessionStorage.setItem(SK.hl, hl);
+  }
+  return { color: SESSION_COLORS[+ci], ctIndex: +cti, headline: hl };
 }
 
-function pickRandom(arr) {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
-
-// ─── Session State ────────────────────────────────────────────────────────────
-
-const SESSION_KEY_COLOR = 'de-fault-color-index';
-const SESSION_KEY_CT    = 'de-fault-ct-index';
-const SESSION_KEY_HL    = 'de-fault-headline';
-
-function initSessionState() {
-  // Color: persist per tab session
-  let colorIndex = sessionStorage.getItem(SESSION_KEY_COLOR);
-  if (colorIndex === null) {
-    colorIndex = Math.floor(Math.random() * SESSION_COLORS.length);
-    sessionStorage.setItem(SESSION_KEY_COLOR, colorIndex);
-  }
-
-  // Content type index
-  let ctIndex = sessionStorage.getItem(SESSION_KEY_CT);
-  if (ctIndex === null) {
-    ctIndex = Math.floor(Math.random() * CONTENT_TYPES.length);
-    sessionStorage.setItem(SESSION_KEY_CT, ctIndex);
-  }
-
-  // Headline
-  let headline = sessionStorage.getItem(SESSION_KEY_HL);
-  if (!headline) {
-    headline = pickRandom(HEADLINES);
-    sessionStorage.setItem(SESSION_KEY_HL, headline);
-  }
-
-  return {
-    color:    SESSION_COLORS[parseInt(colorIndex)],
-    ctIndex:  parseInt(ctIndex),
-    headline
-  };
-}
-
-function rotateContentType(current) {
+function rotateCT(current) {
   const next = (current + 1) % CONTENT_TYPES.length;
-  sessionStorage.setItem(SESSION_KEY_CT, next);
+  sessionStorage.setItem(SK.ct, next);
   return next;
 }
 
-// ─── Overlay Styles ───────────────────────────────────────────────────────────
+// ─── Utilities ─────────────────────────────────────────────────
+
+function hashStr(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = Math.imul(31, h) + s.charCodeAt(i) | 0;
+  return (Math.abs(h) % 900) + 100;
+}
+
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+function esc(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function imgUrl(query, w, h, idx) {
+  return `https://picsum.photos/seed/${hashStr((query || '') + idx)}/${w}/${h}`;
+}
+
+// ─── Type Icons (SVG) ──────────────────────────────────────────
+
+const ICONS = {
+  ARTICLE: `<svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="1" y="1" width="10" height="10" rx="1.5" fill="rgba(255,255,255,0.92)"/>
+    <line x1="3" y1="4.5" x2="9" y2="4.5" stroke="rgba(0,0,0,0.45)" stroke-width="1" stroke-linecap="round"/>
+    <line x1="3" y1="6.5" x2="9" y2="6.5" stroke="rgba(0,0,0,0.45)" stroke-width="1" stroke-linecap="round"/>
+    <line x1="3" y1="8.5" x2="6.5" y2="8.5" stroke="rgba(0,0,0,0.45)" stroke-width="1" stroke-linecap="round"/>
+  </svg>`,
+  VIDEO: `<svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="6" cy="6" r="5.5" fill="rgba(255,255,255,0.92)"/>
+    <path d="M4.5 4L8.5 6L4.5 8V4Z" fill="rgba(0,0,0,0.55)"/>
+  </svg>`,
+  AUDIO: `<svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="6" cy="6" r="5.5" fill="rgba(255,255,255,0.92)"/>
+    <path d="M3.8 8.2C3.8 6.4 4.8 5 6 5s2.2 1.4 2.2 3.2" stroke="rgba(0,0,0,0.5)" stroke-width="1.1" stroke-linecap="round" fill="none"/>
+    <circle cx="6" cy="8.6" r="0.9" fill="rgba(0,0,0,0.5)"/>
+  </svg>`,
+  PRODUCT: `<svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="1.5" y="1.5" width="9" height="9" rx="1.5" fill="rgba(255,255,255,0.92)"/>
+    <path d="M6 3.5v5M3.5 6h5" stroke="rgba(0,0,0,0.5)" stroke-width="1.4" stroke-linecap="round"/>
+  </svg>`
+};
+
+const BOOKMARK_ICON = `<svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M2.5 2h8v9.5L6.5 9 2.5 11.5V2Z" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round"/>
+</svg>`;
+const BOOKMARK_SAVED_ICON = `<svg width="13" height="13" viewBox="0 0 13 13" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+  <path d="M2.5 2h8v9.5L6.5 9 2.5 11.5V2Z" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round"/>
+</svg>`;
+
+// ─── Styles ────────────────────────────────────────────────────
 
 function buildStyles(color) {
+  const ext = chrome.runtime.getURL('');
+
   return `
-    @import url('https://fonts.googleapis.com/css2?family=David+Libre:wght@400;500;700&family=Barlow:wght@400;500;600;700&display=swap');
-
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    .popup {
-      width: 490px;
-      border-radius: 12px;
-      overflow: hidden;
-      box-shadow: 0 24px 64px rgba(0,0,0,0.45), 0 4px 16px rgba(0,0,0,0.2);
-      background: ${color};
-      font-family: 'Adelle Sans', 'Gill Sans', system-ui, -apple-system, sans-serif;
-      user-select: none;
+    @font-face {
+      font-family: "David Libre";
+      font-weight: 400;
+      font-display: swap;
+      src: url("${ext}fonts/DavidLibre-Regular.ttf") format("truetype");
+    }
+    @font-face {
+      font-family: "Barlow";
+      font-weight: 400;
+      font-display: swap;
+      src: url("${ext}fonts/Barlow-Regular.ttf") format("truetype");
+    }
+    @font-face {
+      font-family: "Barlow";
+      font-weight: 600;
+      font-display: swap;
+      src: url("${ext}fonts/Barlow-SemiBold.ttf") format("truetype");
     }
 
-    /* ── Header ── */
+    /* ── Reset ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── Popup shell — 400×620px (--card-w × --card-h) ── */
+    .popup {
+      width: 400px;
+      border-radius: 6px;          /* --r-card */
+      overflow: hidden;
+      background: ${color};
+      box-shadow: 0 8px 24px -6px rgba(0,0,0,0.22), 0 2px 6px rgba(0,0,0,0.14);
+      font-family: "Barlow", system-ui, sans-serif;
+      color: rgb(255,255,255);
+      display: flex;
+      flex-direction: column;
+      animation: df-in 320ms cubic-bezier(0.22,1,0.36,1);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    @keyframes df-in {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Controls row (— ✕) ── */
+    .controls {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 6px;
+      padding: 13px 13px 0;
+      flex-shrink: 0;
+    }
+
+    .btn-ctrl {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.16);
+      border: none;
+      color: rgba(255,255,255,0.75);
+      font-size: 11px;
+      font-family: inherit;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      transition: background 120ms ease;
+    }
+    .btn-ctrl:hover { background: rgba(255,255,255,0.28); }
+
+    /* ── Header: headline + refresh FAB ──
+       Title at --card-title-top (47px from card top)
+       i.e. 47px - controls height (~39px) = 8px header padding-top  */
     .header {
-      padding: 18px 20px 14px 20px;
+      flex: 1;
+      min-height: 0;
+      padding: 8px 16px 16px 20px;
       display: flex;
       align-items: flex-start;
       gap: 12px;
-      background: ${color};
     }
 
     .headline {
-      font-family: 'David Libre', Georgia, 'Times New Roman', serif;
-      font-size: 22px;
-      font-weight: 700;
-      color: #fff;
-      line-height: 1.25;
+      font-family: "David Libre", Georgia, serif;
+      font-weight: 400;
+      font-size: 36px;             /* --fz-display */
+      line-height: 1.10;           /* --lh-display */
+      color: rgb(255,255,255);
+      letter-spacing: 0.002em;
       flex: 1;
-      letter-spacing: -0.01em;
     }
 
-    .controls {
-      display: flex;
-      gap: 4px;
-      margin-top: 2px;
-      flex-shrink: 0;
-    }
-
-    .ctrl-btn {
-      background: rgba(255,255,255,0.18);
+    /* Refresh — matches .df-fab--inactive */
+    .btn-refresh {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.20);  /* --df-fab--inactive */
       border: none;
-      color: #fff;
-      width: 28px;
-      height: 28px;
-      border-radius: 6px;
+      color: rgb(255,255,255);
+      font-size: 20px;
+      font-family: inherit;
       cursor: pointer;
-      font-size: 13px;
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: background 0.15s;
+      flex-shrink: 0;
+      transition: background 120ms ease, transform 500ms cubic-bezier(0.22,1,0.36,1);
       line-height: 1;
     }
-    .ctrl-btn:hover { background: rgba(255,255,255,0.32); }
-    .ctrl-btn.refresh-btn { font-size: 17px; }
+    .btn-refresh:hover  { background: rgba(0,0,0,0.32); }
+    .btn-refresh:active { transform: scale(0.94); }
+    .btn-refresh.spin   { transform: rotate(360deg); }
 
-    /* ── Cards Container ── */
-    .cards-container {
+    /* ── Cards section — 3 cards, starts at --card-content-top (181px) ──
+       Primary: 190px  ·  gap: 4px  ·  Secondary ×2: 100px each  = 398px */
+    .cards {
       display: flex;
       flex-direction: column;
-      gap: 1px;
-      background: rgba(0,0,0,0.25);
+      gap: 4px;
+      flex-shrink: 0;
     }
 
-    /* ── Large Card ── */
-    .card-large {
-      position: relative;
-      height: 210px;
+    .card {
+      display: flex;
       overflow: hidden;
-      background: rgba(0,0,0,0.3);
+      background: rgba(0,0,0,0.20);  /* --surface-recess */
       cursor: pointer;
+      transition: filter 120ms ease;
     }
-    .card-large-img {
-      width: 100%;
-      height: 100%;
+    .card:hover { filter: brightness(1.1); }
+
+    .card-primary   { height: 190px; flex-shrink: 0; }
+    .card-secondary { height: 100px; flex-shrink: 0; }
+
+    .card-img {
+      flex-shrink: 0;
       object-fit: cover;
       display: block;
-      transition: transform 0.3s ease;
+      background: rgba(255,255,255,0.08);
     }
-    .card-large:hover .card-large-img { transform: scale(1.03); }
-    .card-large-gradient {
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(to bottom, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.72) 100%);
-    }
-    .card-large-meta {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
+    .card-primary   .card-img { width: 160px; height: 190px; }
+    .card-secondary .card-img { width: 130px; height: 100px; }
+
+    .card-body {
+      flex: 1;
       padding: 12px 14px;
       display: flex;
       flex-direction: column;
-      gap: 5px;
+      justify-content: space-between;
+      min-width: 0;
     }
-    .card-large-top {
+
+    /* ── Eyebrow: [icon] TYPE | SOURCE [bookmark] ── */
+    .eyebrow {
       display: flex;
       align-items: center;
       justify-content: space-between;
-    }
-
-    /* ── Small Cards ── */
-    .card-small {
-      display: flex;
-      background: rgba(0,0,0,0.3);
-      cursor: pointer;
-      transition: background 0.15s;
-      min-height: 76px;
-    }
-    .card-small:hover { background: rgba(0,0,0,0.45); }
-    .card-small-img {
-      width: 88px;
-      height: 76px;
-      object-fit: cover;
-      flex-shrink: 0;
-      display: block;
-    }
-    .card-small-content {
-      flex: 1;
-      padding: 10px 14px 10px 12px;
-      display: flex;
-      flex-direction: column;
       gap: 4px;
     }
-    .card-small-header {
+    .eyebrow-left {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 8px;
+      gap: 5px;
+      min-width: 0;
+      overflow: hidden;
     }
-    .card-small-meta {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
+    .type-icon { display: flex; align-items: center; flex-shrink: 0; }
 
-    /* ── Badge ── */
-    .badge {
-      font-family: 'Barlow', 'Arial Narrow', sans-serif;
-      font-size: 9px;
-      font-weight: 700;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      padding: 2px 7px;
-      border: 1px solid rgba(255,255,255,0.65);
-      border-radius: 3px;
-      color: #fff;
-      white-space: nowrap;
-    }
-
-    .source-name {
-      font-family: 'Barlow', sans-serif;
-      font-size: 10px;
-      font-weight: 500;
-      color: rgba(255,255,255,0.65);
+    .type-label {
+      font-weight: 600;              /* --fw-semi */
+      font-size: 10px;               /* --fz-meta */
+      color: rgb(255,255,255);       /* --fg-1 */
       letter-spacing: 0.02em;
+      white-space: nowrap;
+      text-transform: uppercase;
+    }
+    .eyebrow-rule {
+      font-size: 10px;
+      color: rgba(255,255,255,0.32); /* --fg-rule */
+      padding: 0 2px;
+    }
+    .source-name {
+      font-weight: 400;
+      font-size: 10px;               /* --fz-meta */
+      color: rgba(255,255,255,0.70); /* --fg-3 */
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      max-width: 90px;
     }
 
+    .btn-bookmark {
+      background: none;
+      border: none;
+      color: rgba(255,255,255,0.32); /* --fg-ghost */
+      cursor: pointer;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+      transition: color 120ms ease;
+      line-height: 1;
+    }
+    .btn-bookmark:hover { color: rgba(255,255,255,0.85); }
+    .btn-bookmark.saved { color: rgb(255,255,255); }
+
+    /* ── Card title ── */
     .card-title {
-      font-size: 13px;
-      font-weight: 600;
-      color: #fff;
-      line-height: 1.35;
+      font-weight: 400;              /* --fw-regular */
+      font-size: 16px;               /* --fz-title */
+      line-height: 1.30;             /* --lh-title */
+      color: rgb(255,255,255);
       display: -webkit-box;
-      -webkit-line-clamp: 2;
+      -webkit-line-clamp: 3;
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
-    .card-large .card-title {
-      font-size: 15px;
+    .card-secondary .card-title {
+      font-size: 14px;
       -webkit-line-clamp: 2;
     }
 
-    .bookmark-btn {
-      background: none;
-      border: none;
-      color: rgba(255,255,255,0.55);
-      cursor: pointer;
-      font-size: 14px;
-      padding: 0;
-      flex-shrink: 0;
-      line-height: 1;
-      transition: color 0.15s;
-    }
-    .bookmark-btn:hover { color: #fff; }
-    .bookmark-btn.saved { color: #fff; }
-
     /* ── Footer ── */
     .footer {
-      padding: 11px 20px;
-      background: rgba(0,0,0,0.22);
+      height: 40px;
+      flex-shrink: 0;
+      padding: 0 16px;
       display: flex;
       align-items: center;
-      justify-content: center;
+      justify-content: space-between;
     }
     .feedback-link {
-      font-family: 'Barlow', sans-serif;
-      font-size: 11px;
-      color: rgba(255,255,255,0.5);
+      font-size: 12px;               /* --fz-body */
+      color: rgba(255,255,255,0.60); /* --fg-4 */
       text-decoration: none;
-      letter-spacing: 0.02em;
+      transition: color 120ms ease;
     }
-    .feedback-link:hover { color: rgba(255,255,255,0.85); }
-
-    /* ── Loading Skeleton ── */
-    .skeleton-wrap { padding: 0; }
-    .skeleton-large { height: 210px; background: rgba(255,255,255,0.08); }
-    .skeleton-small { height: 76px; background: rgba(255,255,255,0.06); margin-top: 1px; }
-    .skeleton-large, .skeleton-small { animation: shimmer 1.6s ease-in-out infinite; }
-    @keyframes shimmer {
-      0%, 100% { opacity: 0.5; }
-      50% { opacity: 1; }
+    .feedback-link:hover { color: rgb(255,255,255); }
+    .copyright {
+      font-size: 10px;               /* --fz-meta */
+      color: rgba(255,255,255,0.45); /* --fg-muted */
     }
 
-    /* ── Error State ── */
-    .error-state {
-      padding: 32px 24px;
-      text-align: center;
+    /* ── Loading skeleton ── */
+    .skel-primary   { height: 190px; }
+    .skel-secondary { height: 100px; }
+    .skel-primary, .skel-secondary {
+      background: rgba(255,255,255,0.10);
+      animation: df-pulse 1.6s ease-in-out infinite;
+    }
+    @keyframes df-pulse { 0%,100% { opacity:.3 } 50% { opacity:.7 } }
+
+    /* ── Error / no-key state ── */
+    .error-wrap {
+      height: 398px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 12px;
+      justify-content: center;
+      gap: 14px;
+      padding: 24px;
+      text-align: center;
     }
-    .error-icon { font-size: 28px; opacity: 0.7; }
+    .error-icon { font-size: 28px; opacity: 0.6; }
     .error-msg {
-      font-size: 13px;
-      color: rgba(255,255,255,0.75);
+      font-size: 12px;
+      color: rgba(255,255,255,0.85);
       line-height: 1.5;
+      max-width: 290px;
     }
-    .error-retry {
-      font-family: 'Barlow', sans-serif;
+    .btn-retry {
+      font-family: inherit;
       font-size: 12px;
       font-weight: 600;
-      color: #fff;
-      background: rgba(255,255,255,0.18);
-      border: 1px solid rgba(255,255,255,0.3);
-      border-radius: 6px;
-      padding: 7px 20px;
+      color: rgb(255,255,255);
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.28);
+      border-radius: 999px;
+      padding: 8px 22px;
       cursor: pointer;
-      letter-spacing: 0.04em;
-      transition: background 0.15s;
+      transition: background 120ms ease;
     }
-    .error-retry:hover { background: rgba(255,255,255,0.3); }
-
-    /* ── API Key Prompt ── */
-    .setup-state {
-      padding: 24px 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .setup-msg {
-      font-size: 13px;
-      color: rgba(255,255,255,0.8);
-      line-height: 1.5;
-    }
-    .setup-hint {
-      font-family: 'Barlow', sans-serif;
-      font-size: 11px;
-      color: rgba(255,255,255,0.5);
-    }
+    .btn-retry:hover { background: rgba(255,255,255,0.25); }
 
     /* ── Minimized ── */
-    .popup.minimized .cards-container,
+    .popup.minimized .cards,
     .popup.minimized .footer { display: none; }
   `;
 }
 
-// ─── Render Helpers ───────────────────────────────────────────────────────────
+// ─── Render Functions ──────────────────────────────────────────
 
 function renderLoading() {
   return `
-    <div class="skeleton-wrap">
-      <div class="skeleton-large"></div>
-      <div class="skeleton-small"></div>
-      <div class="skeleton-small"></div>
-    </div>
+    <div class="skel-primary"></div>
+    <div class="skel-secondary"></div>
+    <div class="skel-secondary"></div>
   `;
 }
 
 function renderError(message) {
-  const isNoKey = message === 'NO_API_KEY';
+  const noKey = message === 'NO_API_KEY';
   return `
-    <div class="error-state">
-      <div class="error-icon">${isNoKey ? '🔑' : '⚠️'}</div>
+    <div class="error-wrap">
+      <div class="error-icon">${noKey ? '🔑' : '⚡'}</div>
       <p class="error-msg">${
-        isNoKey
-          ? 'No API key set. Click the De.fault icon in your toolbar to add your Anthropic API key.'
-          : `Couldn't load suggestions.<br><small style="opacity:0.65">${message}</small>`
+        noKey
+          ? 'Add your Google AI API key via the De.fault toolbar icon to get started.'
+          : esc(message)
       }</p>
-      ${!isNoKey ? '<button class="error-retry">Try again</button>' : ''}
+      ${!noKey ? '<button class="btn-retry">Try again</button>' : ''}
     </div>
   `;
 }
 
-function renderApiKeyPrompt() {
-  return `
-    <div class="setup-state">
-      <p class="setup-msg">To get started, click the <strong style="color:#fff">De.fault icon</strong> in your browser toolbar and enter your Anthropic API key.</p>
-      <p class="setup-hint">Your key is stored locally and never shared.</p>
-    </div>
-  `;
-}
+function renderCard(s, isPrimary, idx) {
+  const imgW  = isPrimary ? 160 : 130;
+  const imgH  = isPrimary ? 190 : 100;
+  const type  = (s.type || 'ARTICLE').toUpperCase();
+  const icon  = ICONS[type] || ICONS.ARTICLE;
 
-function imgUrl(query, width, height, index) {
-  return `https://picsum.photos/seed/${hashString(query + index)}/${width}/${height}`;
-}
-
-function renderSuggestions(suggestions) {
-  const [s0, s1, s2] = suggestions;
   return `
-    <div class="card-large">
-      <img class="card-large-img" src="${imgUrl(s0.imageQuery || s0.title, 490, 210, 0)}" alt="" loading="eager" onerror="this.style.display='none'">
-      <div class="card-large-gradient"></div>
-      <div class="card-large-meta">
-        <div class="card-large-top">
-          <span class="badge">${s0.type || 'ARTICLE'}</span>
-          <button class="bookmark-btn" data-idx="0" title="Save">☆</button>
+    <div class="card ${isPrimary ? 'card-primary' : 'card-secondary'}">
+      <img class="card-img"
+           src="${imgUrl(s.imageQuery || s.title, imgW, imgH, idx)}"
+           alt=""
+           loading="${isPrimary ? 'eager' : 'lazy'}"
+           onerror="this.style.opacity='0'">
+      <div class="card-body">
+        <div class="eyebrow">
+          <span class="eyebrow-left">
+            <span class="type-icon">${icon}</span>
+            <span class="type-label">${esc(type)}</span>
+            <span class="eyebrow-rule"> | </span>
+            <span class="source-name">${esc(s.source)}</span>
+          </span>
+          <button class="btn-bookmark" data-idx="${idx}" title="Save">
+            ${BOOKMARK_ICON}
+          </button>
         </div>
-        <div class="source-name">${escHtml(s0.source)}</div>
-        <p class="card-title">${escHtml(s0.title)}</p>
-      </div>
-    </div>
-    ${renderSmallCard(s1, 1)}
-    ${renderSmallCard(s2, 2)}
-  `;
-}
-
-function renderSmallCard(s, idx) {
-  return `
-    <div class="card-small">
-      <img class="card-small-img" src="${imgUrl(s.imageQuery || s.title, 88, 76, idx)}" alt="" loading="lazy" onerror="this.style.display='none'">
-      <div class="card-small-content">
-        <div class="card-small-header">
-          <div class="card-small-meta">
-            <span class="badge">${s.type || 'ARTICLE'}</span>
-            <span class="source-name">${escHtml(s.source)}</span>
-          </div>
-          <button class="bookmark-btn" data-idx="${idx}" title="Save">☆</button>
-        </div>
-        <p class="card-title">${escHtml(s.title)}</p>
+        <p class="card-title">${esc(s.title)}</p>
       </div>
     </div>
   `;
 }
 
-function escHtml(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+function renderSuggestions(data) {
+  return renderCard(data[0], true, 0)
+    + renderCard(data[1], false, 1)
+    + renderCard(data[2], false, 2);
 }
 
-// ─── Overlay Management ───────────────────────────────────────────────────────
+// ─── Overlay ───────────────────────────────────────────────────
 
-let overlayHost = null;
-let shadow = null;
-let appState = {};
+let host = null, shadow = null, appState = {};
 
-function createOverlay(session) {
-  if (overlayHost) return; // Already mounted
+function mount(session) {
+  if (host) return;
 
-  overlayHost = document.createElement('div');
-  overlayHost.id = 'de-fault-root';
-  overlayHost.style.cssText = `
-    position: fixed;
-    bottom: 24px;
-    right: 24px;
-    z-index: 2147483647;
-  `;
+  host = document.createElement('div');
+  host.id = 'de-fault-root';
+  // Fixed: bottom-right, above everything
+  host.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:2147483647;';
 
-  shadow = overlayHost.attachShadow({ mode: 'open' });
-
+  shadow = host.attachShadow({ mode: 'open' });
   shadow.innerHTML = `
     <style>${buildStyles(session.color)}</style>
     <div class="popup" id="popup">
+      <div class="controls">
+        <button class="btn-ctrl" id="btnMin" title="Minimize">—</button>
+        <button class="btn-ctrl" id="btnClose" title="Close">✕</button>
+      </div>
       <div class="header">
-        <h1 class="headline" id="headline">${escHtml(session.headline)}</h1>
-        <div class="controls">
-          <button class="ctrl-btn refresh-btn" id="refreshBtn" title="New angle">↻</button>
-          <button class="ctrl-btn minimize-btn" id="minimizeBtn" title="Minimize">—</button>
-          <button class="ctrl-btn close-btn" id="closeBtn" title="Close">✕</button>
-        </div>
+        <h1 class="headline" id="headline">${esc(session.headline)}</h1>
+        <button class="btn-refresh" id="btnRefresh" title="New angle">↻</button>
       </div>
-      <div class="cards-container" id="cardsContainer">
-        ${renderLoading()}
-      </div>
+      <div class="cards" id="cards">${renderLoading()}</div>
       <div class="footer">
-        <a href="https://github.com/yoonbeebaek/de-fault-extension/issues" target="_blank" rel="noopener noreferrer" class="feedback-link">Send Feedback</a>
+        <a class="feedback-link"
+           href="https://github.com/yoonbeebaek/de-fault-extension/issues"
+           target="_blank" rel="noopener noreferrer">Send Feedback</a>
+        <span class="copyright">2026 de.fault all rights reserved</span>
       </div>
     </div>
   `;
 
-  // Event listeners
-  shadow.getElementById('refreshBtn').addEventListener('click', handleRefresh);
-  shadow.getElementById('minimizeBtn').addEventListener('click', handleMinimize);
-  shadow.getElementById('closeBtn').addEventListener('click', handleClose);
-  shadow.getElementById('cardsContainer').addEventListener('click', handleCardAreaClick);
+  const $ = (id) => shadow.getElementById(id);
 
-  document.documentElement.appendChild(overlayHost);
-}
+  $('btnMin').addEventListener('click', () => {
+    const minimized = $('popup').classList.toggle('minimized');
+    $('btnMin').textContent = minimized ? '+' : '—';
+  });
 
-function setCardsHtml(html) {
-  if (!shadow) return;
-  shadow.getElementById('cardsContainer').innerHTML = html;
-}
-
-function handleRefresh() {
-  appState.ctIndex = rotateContentType(appState.ctIndex);
-  const newHeadline = pickRandom(HEADLINES);
-  sessionStorage.setItem(SESSION_KEY_HL, newHeadline);
-  shadow.getElementById('headline').textContent = newHeadline;
-  loadSuggestions();
-}
-
-function handleMinimize() {
-  const popup = shadow.getElementById('popup');
-  const isNowMin = !popup.classList.contains('minimized');
-  popup.classList.toggle('minimized');
-  shadow.getElementById('minimizeBtn').textContent = isNowMin ? '+' : '—';
-}
-
-function handleClose() {
-  if (overlayHost) {
-    overlayHost.remove();
-    overlayHost = null;
+  $('btnClose').addEventListener('click', () => {
+    host.remove();
+    host = null;
     shadow = null;
+  });
+
+  $('btnRefresh').addEventListener('click', handleRefresh);
+  $('cards').addEventListener('click', handleCardsClick);
+
+  document.documentElement.appendChild(host);
+}
+
+function setCards(html) {
+  if (shadow) shadow.getElementById('cards').innerHTML = html;
+}
+
+// ─── Interactions ──────────────────────────────────────────────
+
+async function handleRefresh() {
+  const btn = shadow?.getElementById('btnRefresh');
+  if (!btn) return;
+
+  // Spin animation (remove + re-add to restart)
+  btn.classList.remove('spin');
+  void btn.offsetWidth;
+  btn.classList.add('spin');
+  setTimeout(() => btn.classList.remove('spin'), 500);
+
+  appState.ctIndex = rotateCT(appState.ctIndex);
+
+  const hl = pick(HEADLINES);
+  sessionStorage.setItem(SK.hl, hl);
+  if (shadow) shadow.getElementById('headline').textContent = hl;
+
+  await loadSuggestions();
+}
+
+function handleCardsClick(e) {
+  if (e.target.closest('.btn-retry')) {
+    loadSuggestions();
+    return;
+  }
+  const bm = e.target.closest('.btn-bookmark');
+  if (bm) {
+    const saved = bm.classList.toggle('saved');
+    bm.innerHTML = saved ? BOOKMARK_SAVED_ICON : BOOKMARK_ICON;
   }
 }
 
-function handleCardAreaClick(e) {
-  const retryBtn = e.target.closest('.error-retry');
-  if (retryBtn) { loadSuggestions(); return; }
-
-  const bookmarkBtn = e.target.closest('.bookmark-btn');
-  if (bookmarkBtn) {
-    const isSaved = bookmarkBtn.classList.toggle('saved');
-    bookmarkBtn.textContent = isSaved ? '★' : '☆';
-  }
-}
-
-// ─── Data Fetching ────────────────────────────────────────────────────────────
+// ─── Data ──────────────────────────────────────────────────────
 
 async function loadSuggestions() {
-  setCardsHtml(renderLoading());
+  setCards(renderLoading());
 
-  const contentType = CONTENT_TYPES[appState.ctIndex];
-  const response = await chrome.runtime.sendMessage({
+  const ct   = CONTENT_TYPES[appState.ctIndex];
+  const resp = await chrome.runtime.sendMessage({
     type: 'FETCH_SUGGESTIONS',
     payload: {
-      context: appState.context,
-      intent: appState.intent,
-      contentTypeDesc: contentType.desc
+      context:         appState.context,
+      intent:          appState.intent,
+      contentTypeDesc: ct.desc
     }
   });
 
-  if (response.ok) {
-    setCardsHtml(renderSuggestions(response.data));
-  } else {
-    setCardsHtml(renderError(response.error));
-  }
+  setCards(resp.ok ? renderSuggestions(resp.data) : renderError(resp.error));
 }
 
-// ─── Boot ─────────────────────────────────────────────────────────────────────
+// ─── Boot ──────────────────────────────────────────────────────
 
 async function boot() {
   const pageCtx = getPageContext();
   if (!pageCtx) return;
 
-  const session = initSessionState();
+  const session  = initSession();
   appState = {
     context:  pageCtx.context,
     intent:   detectIntent(pageCtx.context),
@@ -618,27 +713,26 @@ async function boot() {
     color:    session.color
   };
 
-  // Small delay so the page settles and the popup doesn't feel jarring
+  // Give the page 2.2s to settle before appearing
   await new Promise(r => setTimeout(r, 2200));
 
-  // Bail if user navigated away before timer fired
-  const freshCtx = getPageContext();
-  if (!freshCtx) return;
+  // Abort if user navigated away during wait
+  if (!getPageContext()) return;
 
   const { hasKey } = await chrome.runtime.sendMessage({ type: 'CHECK_API_KEY' });
 
-  createOverlay(session);
+  mount(session);
 
   if (!hasKey) {
-    setCardsHtml(renderApiKeyPrompt());
+    setCards(renderError('NO_API_KEY'));
     return;
   }
 
   await loadSuggestions();
 }
 
-// Run only once per page load (avoid double-injection on SPAs doing pushState)
-if (!window.__defaultExtLoaded) {
-  window.__defaultExtLoaded = true;
+// Guard against double-injection on SPA route changes
+if (!window.__dfLoaded) {
+  window.__dfLoaded = true;
   boot();
 }

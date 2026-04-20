@@ -10,47 +10,42 @@
 <body class="df-surface">
   <div class="container">
 
-    <header class="header">
+    <header class="card-header">
       <h1 class="df-h1 logo">De.fault</h1>
-      <p class="tagline df-meta">De-personalization engine</p>
+      <p class="df-meta tagline">De-personalization engine</p>
     </header>
 
     <main class="main">
-      <section class="section">
-        <label class="label df-eyebrow" for="apiKey">Google AI API Key</label>
-        <div class="input-wrap">
-          <input
-            type="password"
-            id="apiKey"
-            class="input"
-            placeholder="AIzaSy…"
-            autocomplete="off"
-            spellcheck="false"
-          >
-          <button class="toggle-btn" id="toggleVisibility" type="button" title="Show/hide key">
-            <svg id="eyeOpen" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-            <svg id="eyeClosed" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-          </button>
+      <div class="status-row" id="statusRow">
+        <span class="dot dot-active"></span>
+        <span class="df-body status-text">Ready</span>
+      </div>
+
+      <p class="df-body desc">
+        De.fault reads your current page context and surfaces 3 unexpected but meaningfully adjacent perspectives — things you'd never encounter in a personalized feed.
+      </p>
+
+      <div class="how-row">
+        <div class="how-item">
+          <span class="how-num df-eyebrow">01</span>
+          <span class="df-meta how-text">Reads current page context</span>
         </div>
-        <p class="hint df-body">Stored locally in your browser. Only sent to Google's Gemini API.</p>
-      </section>
-
-      <div id="status" class="status hidden"></div>
-
-      <button class="save-btn" id="saveBtn" type="button">Save Key</button>
-
-      <div id="keyStatus" class="key-status hidden">
-        <span class="key-dot"></span>
-        <span id="keyStatusText" class="df-meta"></span>
-        <button class="clear-btn df-eyebrow" id="clearBtn" type="button">Remove</button>
+        <div class="how-item">
+          <span class="how-num df-eyebrow">02</span>
+          <span class="df-meta how-text">Detects your intent</span>
+        </div>
+        <div class="how-item">
+          <span class="how-num df-eyebrow">03</span>
+          <span class="df-meta how-text">Generates adjacent suggestions</span>
+        </div>
       </div>
     </main>
 
-    <footer class="bottom-bar df-footer">
-      <span>Works on any page with readable content.</span>
-      <a href="https://aistudio.google.com/app/apikey"
+    <footer class="bottom-bar">
+      <a href="https://github.com/yoonbeebaek/de-fault-extension/issues"
          target="_blank" rel="noopener noreferrer"
-         class="df-link get-key-link">Get free key ↗</a>
+         class="df-link">Send Feedback</a>
+      <span class="df-footer">2026 de.fault</span>
     </footer>
 
   </div>

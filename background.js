@@ -1,5 +1,13 @@
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
+// Built-in key — works out of the box. Override via chrome.storage if needed.
+const BUILT_IN_KEY = 'AIzaSyA1S_QMCkAtiZl9mfE7PXUzDVBujOFZmqM';
+
+async function getApiKey() {
+  const { apiKey } = await chrome.storage.local.get('apiKey');
+  return (apiKey && apiKey.trim()) ? apiKey.trim() : BUILT_IN_KEY;
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'FETCH_SUGGESTIONS') {
     fetchSuggestions(message.payload)
@@ -9,18 +17,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === 'CHECK_API_KEY') {
-    chrome.storage.local.get('apiKey').then(({ apiKey }) => {
-      sendResponse({ hasKey: Boolean(apiKey && apiKey.trim()) });
-    });
+    sendResponse({ hasKey: true }); // always ready
     return true;
   }
 });
 
 async function fetchSuggestions({ context, intent, contentTypeDesc }) {
-  const { apiKey } = await chrome.storage.local.get('apiKey');
-  if (!apiKey || !apiKey.trim()) throw new Error('NO_API_KEY');
+  const apiKey = await getApiKey();
 
-  const response = await fetch(`${GEMINI_URL}?key=${apiKey.trim()}`, {
+  const response = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

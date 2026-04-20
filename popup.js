@@ -1,32 +1,29 @@
-const apiKeyInput    = document.getElementById('apiKey');
-const saveBtn        = document.getElementById('saveBtn');
-const statusEl       = document.getElementById('status');
-const keyStatusEl    = document.getElementById('keyStatus');
-const keyStatusText  = document.getElementById('keyStatusText');
-const clearBtn       = document.getElementById('clearBtn');
-const toggleBtn      = document.getElementById('toggleVisibility');
-const eyeOpen        = document.getElementById('eyeOpen');
-const eyeClosed      = document.getElementById('eyeClosed');
+const apiKeyInput   = document.getElementById('apiKey');
+const saveBtn       = document.getElementById('saveBtn');
+const statusEl      = document.getElementById('status');
+const keyStatusEl   = document.getElementById('keyStatus');
+const keyStatusText = document.getElementById('keyStatusText');
+const clearBtn      = document.getElementById('clearBtn');
+const toggleBtn     = document.getElementById('toggleVisibility');
+const eyeOpen       = document.getElementById('eyeOpen');
+const eyeClosed     = document.getElementById('eyeClosed');
 
 // Load existing key on open
 chrome.storage.local.get('apiKey').then(({ apiKey }) => {
-  if (apiKey && apiKey.trim()) {
-    showKeyStatus(apiKey.trim());
-  }
+  if (apiKey?.trim()) showKeyStatus(apiKey.trim());
 });
 
 saveBtn.addEventListener('click', async () => {
   const key = apiKeyInput.value.trim();
-
   if (!key) {
     showStatus('Please enter an API key.', 'error');
     return;
   }
-  if (!key.startsWith('sk-ant-')) {
-    showStatus('Key should start with sk-ant-…', 'error');
+  // Google AI Studio keys start with AIza
+  if (!key.startsWith('AIza')) {
+    showStatus('Key should start with AIza…', 'error');
     return;
   }
-
   await chrome.storage.local.set({ apiKey: key });
   apiKeyInput.value = '';
   showStatus('API key saved!', 'success');
@@ -40,27 +37,27 @@ clearBtn.addEventListener('click', async () => {
 });
 
 toggleBtn.addEventListener('click', () => {
-  const isPassword = apiKeyInput.type === 'password';
-  apiKeyInput.type = isPassword ? 'text' : 'password';
-  eyeOpen.style.display   = isPassword ? 'none' : '';
-  eyeClosed.style.display = isPassword ? '' : 'none';
+  const isPass = apiKeyInput.type === 'password';
+  apiKeyInput.type = isPass ? 'text' : 'password';
+  eyeOpen.style.display   = isPass ? 'none' : '';
+  eyeClosed.style.display = isPass ? '' : 'none';
 });
 
 apiKeyInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') saveBtn.click();
 });
 
+let statusTimer;
 function showStatus(message, type) {
   statusEl.textContent = message;
   statusEl.className = `status ${type}`;
-  clearTimeout(showStatus._timer);
-  showStatus._timer = setTimeout(() => {
+  clearTimeout(statusTimer);
+  statusTimer = setTimeout(() => {
     statusEl.className = 'status hidden';
   }, 3000);
 }
 
 function showKeyStatus(key) {
-  const masked = key.substring(0, 10) + '••••••••' + key.slice(-4);
-  keyStatusText.textContent = masked;
+  keyStatusText.textContent = key.slice(0, 8) + '••••••••' + key.slice(-4);
   keyStatusEl.classList.remove('hidden');
 }

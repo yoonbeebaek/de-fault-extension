@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>De.fault Settings</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=David+Libre:wght@700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1 class="logo">De.fault</h1>
+      <p class="tagline">De-personalization engine</p>
+    </header>
+
+    <main class="main">
+      <section class="section">
+        <label class="label" for="apiKey">Anthropic API Key</label>
+        <div class="input-wrap">
+          <input
+            type="password"
+            id="apiKey"
+            class="input"
+            placeholder="sk-ant-..."
+            autocomplete="off"
+            spellcheck="false"
+          >
+          <button class="toggle-btn" id="toggleVisibility" title="Show/hide key" type="button">
+            <svg id="eyeOpen" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg id="eyeClosed" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+          </button>
+        </div>
+        <p class="hint">Stored locally in your browser. Never sent anywhere except Anthropic's API.</p>
+      </section>
+
+      <div id="status" class="status hidden"></div>
+
+      <button class="save-btn" id="saveBtn" type="button">Save API Key</button>
+
+      <div id="keyStatus" class="key-status hidden">
+        <span class="key-indicator"></span>
+        <span id="keyStatusText"></span>
+        <button class="clear-btn" id="clearBtn" type="button">Clear</button>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <p>Works on Google Search &amp; article pages.</p>
+      <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer" class="link">Get an API key ↗</a>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

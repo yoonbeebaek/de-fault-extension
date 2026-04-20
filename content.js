@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 //  De.fault — content.js
-//  De-personalization engine. Reads any page context, intersects
-//  Intent × Content-Type, surfaces 3 unexpected adjacent pieces.
+//  Reads any page context. Intersects Intent × Content-Type.
+//  Surfaces 3 unexpected adjacent content pieces via Gemini.
 // ═══════════════════════════════════════════════════════════════
 
 // ─── Copy ──────────────────────────────────────────────────────
@@ -16,7 +16,6 @@ const HEADLINES = [
   'Hope this also motivates you.'
 ];
 
-// Intent × Content-Type matrix (8 angles)
 const CONTENT_TYPES = [
   { key: 'cause',        desc: 'the root cause — what caused this topic to exist?' },
   { key: 'effect',       desc: 'downstream consequences — what happens because of this?' },
@@ -28,7 +27,7 @@ const CONTENT_TYPES = [
   { key: 'examples',     desc: 'illustrative examples — concrete real-world cases that show this in action' }
 ];
 
-// Card palette from tokens.css — all entries safe for white fg-1 text
+// Card palette — all design-system tokens, white text safe
 const SESSION_COLORS = [
   'rgb(142,30,30)',   // --red-1
   'rgb(118,57,64)',   // --red-3
@@ -50,79 +49,80 @@ const SESSION_COLORS = [
   'rgb(65,64,63)'     // --slate-2
 ];
 
-// ─── Page Context — works on any page with detectable text ─────
+// ─── Page context — any page with readable text ────────────────
 
 function getPageContext() {
   const url  = window.location.href;
   const host = window.location.hostname;
 
-  // Skip browser-internal and non-HTML pages
-  if (/^(chrome|chrome-extension|moz-extension|edge|brave|about|data|file|blob):/.test(url)) return null;
+  if (/^(chrome|chrome-extension|moz-extension|edge|about|data|file|blob):/.test(url)) return null;
   if (/^(localhost|127\.|0\.0\.0\.0)/.test(host)) return null;
   if (/\.(pdf|xml|json|csv|txt)(\?.*)?$/i.test(url)) return null;
 
-  // 1. Google Search — most reliable signal
+  // Google Search
   if (/google\.[a-z.]+\/search/.test(url)) {
     const q = new URLSearchParams(window.location.search).get('q');
-    if (q?.trim().length >= 3) return { context: q.trim(), source: 'search' };
+    if (q?.trim().length >= 3) return { context: q.trim() };
   }
 
-  // 2. YouTube video
+  // YouTube
   if (host.includes('youtube.com') && url.includes('/watch')) {
-    const clean = document.title?.replace(/\s*-\s*YouTube\s*$/, '').trim();
-    if (clean?.length > 4) return { context: clean, source: 'youtube' };
+    const t = document.title?.replace(/\s*-\s*YouTube\s*$/, '').trim();
+    if (t?.length > 4) return { context: t };
   }
 
-  // 3. Twitter / X
+  // Twitter / X
   if (host.includes('twitter.com') || host.includes('x.com')) {
-    const tweet = document.querySelector('[data-testid="tweetText"]');
-    if (tweet?.textContent.trim().length > 10)
-      return { context: tweet.textContent.trim().slice(0, 200), source: 'twitter' };
+    const el = document.querySelector('[data-testid="tweetText"]');
+    if (el?.textContent.trim().length > 10)
+      return { context: el.textContent.trim().slice(0, 200) };
   }
 
-  // 4. Reddit — handles both old and new Reddit
+  // Reddit
   if (host.includes('reddit.com')) {
     const el = document.querySelector(
       'h1[data-testid="post-title"], shreddit-post h1, [data-click-id="title"] h3, h1.title'
     );
     if (el?.textContent.trim().length > 5)
-      return { context: el.textContent.trim().slice(0, 200), source: 'reddit' };
+      return { context: el.textContent.trim().slice(0, 200) };
   }
 
-  // 5. Wikipedia
+  // Wikipedia
   if (host.includes('wikipedia.org')) {
-    const h1 = document.querySelector('#firstHeading');
-    if (h1?.textContent.trim()) return { context: h1.textContent.trim(), source: 'wikipedia' };
+    const el = document.querySelector('#firstHeading');
+    if (el?.textContent.trim()) return { context: el.textContent.trim() };
   }
 
-  // 6. Any article — prefer article > main scoped h1
+  // Article h1
   const h1 = document.querySelector('article h1, main h1, h1');
   if (h1?.textContent.trim().length >= 15)
-    return { context: h1.textContent.trim().slice(0, 200), source: 'article' };
+    return { context: h1.textContent.trim().slice(0, 200) };
 
-  // 7. Open Graph title (content-focused, usually cleaner than <title>)
+  // Open Graph title
   const og = document.querySelector('meta[property="og:title"]')?.content?.trim();
-  if (og?.length >= 10) return { context: og.slice(0, 200), source: 'og' };
+  if (og?.length >= 10) return { context: og.slice(0, 200) };
 
-  // 8. Page <title> — strip common " | Site Name" suffixes
+  // Page title — strip site-name suffix
   const raw = document.title?.trim();
   if (raw?.length >= 10) {
     const clean = raw
       .replace(/\s*[-–—|·•]\s*[^-–—|·•]{1,50}$/, '')
       .replace(/\s*[-–—|·•]\s*[^-–—|·•]{1,50}$/, '')
       .trim();
-    if (clean.length >= 8) return { context: clean, source: 'title' };
-    return { context: raw.slice(0, 200), source: 'title' };
+    if (clean.length >= 8) return { context: clean };
+    return { context: raw.slice(0, 200) };
   }
 
-  // 9. Meta description fallback
-  const desc = document.querySelector('meta[name="description"], meta[property="og:description"]')?.content?.trim();
-  if (desc?.length >= 20) return { context: desc.slice(0, 200), source: 'meta' };
+  // Meta description
+  const desc = document.querySelector(
+    'meta[name="description"], meta[property="og:description"]'
+  )?.content?.trim();
+  if (desc?.length >= 20) return { context: desc.slice(0, 200) };
 
   return null;
 }
 
-// ─── Intent Detection ──────────────────────────────────────────
+// ─── Intent detection ──────────────────────────────────────────
 
 function detectIntent(text) {
   const t = text.toLowerCase();
@@ -152,7 +152,7 @@ function detectIntent(text) {
   return "I'm open to discovery";
 }
 
-// ─── Session State ─────────────────────────────────────────────
+// ─── Session state ─────────────────────────────────────────────
 
 const SK = { color: 'df-ci', ct: 'df-cti', hl: 'df-hl' };
 
@@ -197,42 +197,60 @@ function esc(s) {
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function imgUrl(query, w, h, idx) {
-  return `https://picsum.photos/seed/${hashStr((query || '') + idx)}/${w}/${h}`;
+function imgUrl(query, size, idx) {
+  return `https://picsum.photos/seed/${hashStr((query || '') + idx)}/${size}/${size}`;
 }
 
-// ─── Type Icons (SVG) ──────────────────────────────────────────
+// ─── Icons — exact SVG paths from DfIcon / DfMediumIcon ────────
 
-const ICONS = {
-  ARTICLE: `<svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect x="1" y="1" width="10" height="10" rx="1.5" fill="rgba(255,255,255,0.92)"/>
-    <line x1="3" y1="4.5" x2="9" y2="4.5" stroke="rgba(0,0,0,0.45)" stroke-width="1" stroke-linecap="round"/>
-    <line x1="3" y1="6.5" x2="9" y2="6.5" stroke="rgba(0,0,0,0.45)" stroke-width="1" stroke-linecap="round"/>
-    <line x1="3" y1="8.5" x2="6.5" y2="8.5" stroke="rgba(0,0,0,0.45)" stroke-width="1" stroke-linecap="round"/>
+// DfIcon: 15×15 circle icons for card chrome
+const ICON_CLOSE = `<svg width="15" height="15" viewBox="0 0 15 15" fill="currentColor">
+  <path d="M7.5 0a7.5 7.5 0 110 15 7.5 7.5 0 010-15zm-2.8 4.7a.6.6 0 00-.85.85L6.65 7.5 3.85 9.45a.6.6 0 10.85.85L7.5 8.35l2.8 2.8a.6.6 0 10.85-.85L8.35 7.5l2.8-2.8a.6.6 0 00-.85-.85L7.5 6.65 4.7 4.7z"/>
+</svg>`;
+
+const ICON_SHRINK = `<svg width="15" height="15" viewBox="0 0 15 15" fill="currentColor">
+  <path d="M7.5 0a7.5 7.5 0 110 15 7.5 7.5 0 010-15zM4.17 6.9a.6.6 0 100 1.2h6.66a.6.6 0 100-1.2z"/>
+</svg>`;
+
+// DfIcon redo — 44px FAB, icon rendered inside at ~20px
+const ICON_REDO = `<svg width="22" height="22" viewBox="0 0 26 26" fill="currentColor">
+  <path d="M13 2 a11 11 0 1 1 -10 14 l2 -.7 a9 9 0 1 0 8.5 -12 L14 6 L10 3 L14 0Z"/>
+</svg>`;
+
+// DfIcon save — bookmark ribbon, 10×10 for eyebrow
+const ICON_SAVE = `<svg width="10" height="12" viewBox="0 0 7 10" fill="currentColor">
+  <path d="M7 .8a.8.8 0 00-.8-.8H.8A.8.8 0 000 .8v8.1c0 .56.58.93 1.1.7L3 8.76a.6.6 0 01.5 0l1.9.85a.77.77 0 001.1-.7Z"/>
+</svg>`;
+const ICON_SAVE_ACTIVE = ICON_SAVE; // same path, CSS drives color change
+
+// DfMediumIcon — 12×12 content-type glyphs
+const MEDIUM_ICONS = {
+  ARTICLE: `<svg width="12" height="12" viewBox="0 0 12 12" fill="rgba(255,255,255,0.70)">
+    <path d="M10 0C11.1 0 12 .9 12 2v8c0 1.1-.9 2-2 2H2C.9 12 0 11.1 0 10V2C0 .9.9 0 2 0h8zM3.5 7.5v1h5v-1h-5zm0-2v1h5v-1h-5zm0-2v1h5v-1h-5z"/>
   </svg>`,
-  VIDEO: `<svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="6" cy="6" r="5.5" fill="rgba(255,255,255,0.92)"/>
-    <path d="M4.5 4L8.5 6L4.5 8V4Z" fill="rgba(0,0,0,0.55)"/>
+  VIDEO: `<svg width="12" height="12" viewBox="0 0 12 12" fill="rgba(255,255,255,0.70)">
+    <rect width="12" height="12" rx="2"/>
+    <path d="M5 3.5L9 6 5 8.5V3.5z" fill="rgba(0,0,0,0.7)"/>
   </svg>`,
-  AUDIO: `<svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="6" cy="6" r="5.5" fill="rgba(255,255,255,0.92)"/>
-    <path d="M3.8 8.2C3.8 6.4 4.8 5 6 5s2.2 1.4 2.2 3.2" stroke="rgba(0,0,0,0.5)" stroke-width="1.1" stroke-linecap="round" fill="none"/>
-    <circle cx="6" cy="8.6" r="0.9" fill="rgba(0,0,0,0.5)"/>
+  AUDIO: `<svg width="12" height="12" viewBox="0 0 12 12" fill="rgba(255,255,255,0.70)">
+    <circle cx="4" cy="8" r="1.8"/>
+    <circle cx="9" cy="7" r="1.4"/>
+    <path d="M5.8 8V3L10.4 2V7" stroke="rgba(255,255,255,0.70)" stroke-width="1" fill="none"/>
   </svg>`,
-  PRODUCT: `<svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect x="1.5" y="1.5" width="9" height="9" rx="1.5" fill="rgba(255,255,255,0.92)"/>
-    <path d="M6 3.5v5M3.5 6h5" stroke="rgba(0,0,0,0.5)" stroke-width="1.4" stroke-linecap="round"/>
+  PRODUCT: `<svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+    <path d="M2 4L6 2l4 2v5l-4 2-4-2V4z" stroke="rgba(255,255,255,0.70)" stroke-width="1"/>
   </svg>`
 };
 
-const BOOKMARK_ICON = `<svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M2.5 2h8v9.5L6.5 9 2.5 11.5V2Z" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round"/>
-</svg>`;
-const BOOKMARK_SAVED_ICON = `<svg width="13" height="13" viewBox="0 0 13 13" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-  <path d="M2.5 2h8v9.5L6.5 9 2.5 11.5V2Z" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round"/>
-</svg>`;
-
 // ─── Styles ────────────────────────────────────────────────────
+//
+//  All measurements from Figma spec:
+//  Card:          400 × 620px, radius 6
+//  Title slot:    left:25  top:47   w:298  h:104   (David Libre 36/40)
+//  Content slot:  left:20  top:181  w:360  h:396
+//    Primary rec: 172 × 172px image well
+//    Secondary:   100 × 100px image wells
+//  Footer:        1px rule + shadow, 43px tall
 
 function buildStyles(color) {
   const ext = chrome.runtime.getURL('');
@@ -257,22 +275,26 @@ function buildStyles(color) {
       src: url("${ext}fonts/Barlow-SemiBold.ttf") format("truetype");
     }
 
-    /* ── Reset ── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    /* ── Popup shell — 400×620px (--card-w × --card-h) ── */
+    /* ── Card shell: 400×620, radius 6 ── */
     .popup {
+      position: relative;
       width: 400px;
-      border-radius: 6px;          /* --r-card */
+      border-radius: 6px;
       overflow: hidden;
       background: ${color};
+      /* Subtle 5%→0% black gradient top→bottom */
+      background-image: linear-gradient(rgba(0,0,0,0.05) 0%, rgba(0,0,0,0) 100%);
+      background-blend-mode: multiply;
       box-shadow: 0 8px 24px -6px rgba(0,0,0,0.22), 0 2px 6px rgba(0,0,0,0.14);
       font-family: "Barlow", system-ui, sans-serif;
+      font-weight: 400;
       color: rgb(255,255,255);
       display: flex;
       flex-direction: column;
-      animation: df-in 320ms cubic-bezier(0.22,1,0.36,1);
       -webkit-font-smoothing: antialiased;
+      animation: df-in 320ms cubic-bezier(0.22,1,0.36,1);
     }
 
     @keyframes df-in {
@@ -280,176 +302,177 @@ function buildStyles(color) {
       to   { opacity: 1; transform: translateY(0); }
     }
 
-    /* ── Controls row (— ✕) ── */
+    /* ── Control bar: close + shrink, 15×15, absolute top:16 right:16 ── */
     .controls {
+      position: absolute;
+      top: 16px;
+      right: 16px;
       display: flex;
-      justify-content: flex-end;
       align-items: center;
-      gap: 6px;
-      padding: 13px 13px 0;
-      flex-shrink: 0;
+      gap: 16px;
+      z-index: 2;
     }
 
     .btn-ctrl {
-      width: 26px;
-      height: 26px;
-      border-radius: 50%;
-      background: rgba(255,255,255,0.16);
+      background: none;
       border: none;
-      color: rgba(255,255,255,0.75);
-      font-size: 11px;
-      font-family: inherit;
+      padding: 0;
       cursor: pointer;
+      color: rgba(255,255,255,0.32);   /* ghost */
       display: flex;
       align-items: center;
-      justify-content: center;
-      line-height: 1;
-      transition: background 120ms ease;
+      transition: color 120ms ease;
+      line-height: 0;
     }
-    .btn-ctrl:hover { background: rgba(255,255,255,0.28); }
+    .btn-ctrl:hover { color: rgb(255,255,255); }
 
-    /* ── Header: headline + refresh FAB ──
-       Title at --card-title-top (47px from card top)
-       i.e. 47px - controls height (~39px) = 8px header padding-top  */
+    /* ── Header: title slot — left:25 top:47 w:298 h:104 ──
+       padding-top:47  puts title at correct y
+       padding-bottom:30  fills gap so header = 181px (--card-content-top) */
     .header {
-      flex: 1;
-      min-height: 0;
-      padding: 8px 16px 16px 20px;
+      padding: 47px 25px 30px 25px;
       display: flex;
       align-items: flex-start;
-      gap: 12px;
+      gap: 8px;
+      flex-shrink: 0;
     }
 
+    /* 47 + 104 + 30 = 181px = --card-content-top ✓ */
     .headline {
       font-family: "David Libre", Georgia, serif;
       font-weight: 400;
-      font-size: 36px;             /* --fz-display */
-      line-height: 1.10;           /* --lh-display */
+      font-size: 36px;
+      line-height: 40px;           /* spec: 36/40 */
       color: rgb(255,255,255);
       letter-spacing: 0.002em;
-      flex: 1;
+      width: 298px;                /* spec: w:298 */
+      max-height: 104px;           /* spec: h:104 */
+      overflow: hidden;
+      flex-shrink: 0;
     }
 
-    /* Refresh — matches .df-fab--inactive */
+    /* Refresh FAB — .df-fab--inactive style */
     .btn-refresh {
       width: 44px;
       height: 44px;
       border-radius: 50%;
-      background: rgba(0,0,0,0.20);  /* --df-fab--inactive */
+      background: rgba(0,0,0,0.20);
       border: none;
       color: rgb(255,255,255);
-      font-size: 20px;
-      font-family: inherit;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
       transition: background 120ms ease, transform 500ms cubic-bezier(0.22,1,0.36,1);
-      line-height: 1;
+      line-height: 0;
     }
-    .btn-refresh:hover  { background: rgba(0,0,0,0.32); }
+    .btn-refresh:hover  { background: rgba(0,0,0,0.35); }
     .btn-refresh:active { transform: scale(0.94); }
     .btn-refresh.spin   { transform: rotate(360deg); }
 
-    /* ── Cards section — 3 cards, starts at --card-content-top (181px) ──
-       Primary: 190px  ·  gap: 4px  ·  Secondary ×2: 100px each  = 398px */
+    /* ── Content slot: left:20 top:181 w:360 h:396 ── */
     .cards {
+      padding: 0 20px 4px 20px;    /* 400 - 20 - 20 = 360px wide = spec w:360 */
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 10px;
       flex-shrink: 0;
     }
 
+    /* ── Recommendation wells — rgba(0,0,0,0.2) at border-radius:3 ── */
     .card {
       display: flex;
       overflow: hidden;
-      background: rgba(0,0,0,0.20);  /* --surface-recess */
+      background: rgba(0,0,0,0.20);
+      border-radius: 3px;
       cursor: pointer;
       transition: filter 120ms ease;
     }
     .card:hover { filter: brightness(1.1); }
 
-    .card-primary   { height: 190px; flex-shrink: 0; }
+    .card-primary   { height: 172px; flex-shrink: 0; }
     .card-secondary { height: 100px; flex-shrink: 0; }
 
+    /* Square images with rounded left corners only */
     .card-img {
       flex-shrink: 0;
       object-fit: cover;
       display: block;
-      background: rgba(255,255,255,0.08);
+      background: rgb(217,217,217);   /* --neutral-gray fallback */
     }
-    .card-primary   .card-img { width: 160px; height: 190px; }
-    .card-secondary .card-img { width: 130px; height: 100px; }
+    .card-primary   .card-img { width: 172px; height: 172px; border-radius: 3px 0 0 3px; }
+    .card-secondary .card-img { width: 100px; height: 100px; border-radius: 3px 0 0 3px; }
 
     .card-body {
       flex: 1;
-      padding: 12px 14px;
+      padding: 12px 16px;
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
+      gap: 10px;
       min-width: 0;
     }
+    .card-secondary .card-body { padding: 10px 14px; gap: 6px; }
 
-    /* ── Eyebrow: [icon] TYPE | SOURCE [bookmark] ── */
+    /* ── Eyebrow: [icon] TYPE [1px rule] SOURCE [save] ── */
     .eyebrow {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 4px;
+      gap: 6px;
     }
-    .eyebrow-left {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      min-width: 0;
-      overflow: hidden;
-    }
-    .type-icon { display: flex; align-items: center; flex-shrink: 0; }
+
+    .medium-icon { display: flex; align-items: center; flex-shrink: 0; line-height: 0; }
 
     .type-label {
-      font-weight: 600;              /* --fw-semi */
-      font-size: 10px;               /* --fz-meta */
-      color: rgb(255,255,255);       /* --fg-1 */
-      letter-spacing: 0.02em;
-      white-space: nowrap;
-      text-transform: uppercase;
-    }
-    .eyebrow-rule {
+      font-weight: 600;
       font-size: 10px;
-      color: rgba(255,255,255,0.32); /* --fg-rule */
-      padding: 0 2px;
+      color: rgba(255,255,255,0.70);   /* --fg-3 */
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      white-space: nowrap;
     }
+
+    /* 1px × 8px vertical rule — spec: background: var(--fg-rule) */
+    .eyebrow-rule {
+      display: inline-block;
+      width: 1px;
+      height: 8px;
+      background: rgba(255,255,255,0.32);
+      flex-shrink: 0;
+    }
+
     .source-name {
       font-weight: 400;
-      font-size: 10px;               /* --fz-meta */
-      color: rgba(255,255,255,0.70); /* --fg-3 */
+      font-size: 10px;
+      color: rgba(255,255,255,0.70);   /* --fg-3 */
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 90px;
+      max-width: 80px;
     }
 
-    .btn-bookmark {
+    /* save icon — marginLeft:auto pushes to right edge */
+    .btn-save {
+      margin-left: auto;
       background: none;
       border: none;
-      color: rgba(255,255,255,0.32); /* --fg-ghost */
+      color: rgba(255,255,255,0.32);   /* --fg-ghost */
       cursor: pointer;
       padding: 0;
       display: flex;
       align-items: center;
       flex-shrink: 0;
       transition: color 120ms ease;
-      line-height: 1;
+      line-height: 0;
     }
-    .btn-bookmark:hover { color: rgba(255,255,255,0.85); }
-    .btn-bookmark.saved { color: rgb(255,255,255); }
+    .btn-save:hover { color: rgba(255,255,255,0.85); }
+    .btn-save.saved { color: rgb(255,255,255); }
 
-    /* ── Card title ── */
+    /* ── Recommendation title ── */
     .card-title {
-      font-weight: 400;              /* --fw-regular */
-      font-size: 16px;               /* --fz-title */
-      line-height: 1.30;             /* --lh-title */
+      font-weight: 400;
+      font-size: 16px;            /* --fz-title */
+      line-height: 1.30;          /* --lh-title */
       color: rgb(255,255,255);
       display: -webkit-box;
       -webkit-line-clamp: 3;
@@ -457,49 +480,60 @@ function buildStyles(color) {
       overflow: hidden;
     }
     .card-secondary .card-title {
-      font-size: 14px;
+      font-size: 13px;
+      line-height: 1.3;
       -webkit-line-clamp: 2;
     }
 
-    /* ── Footer ── */
+    /* ── Footer: 1px rule + shadow, 43px, left:20 ──
+       spec: "Send Feedback · 2026 de.fault all rights reserved" */
     .footer {
-      height: 40px;
+      position: relative;
+      height: 43px;
       flex-shrink: 0;
-      padding: 0 16px;
+      padding: 0 20px;
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
+    .footer::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 20px; right: 20px;
+      height: 1px;
+      background: rgba(255,255,255,0.20);
+      box-shadow: 0px 1px 2px 0px rgba(0,0,0,0.35);   /* --shadow-rule */
+    }
     .feedback-link {
-      font-size: 12px;               /* --fz-body */
-      color: rgba(255,255,255,0.60); /* --fg-4 */
+      font-size: 12px;
+      color: rgba(255,255,255,0.60);   /* --fg-4 */
       text-decoration: none;
       transition: color 120ms ease;
     }
     .feedback-link:hover { color: rgb(255,255,255); }
     .copyright {
-      font-size: 10px;               /* --fz-meta */
-      color: rgba(255,255,255,0.45); /* --fg-muted */
+      font-size: 10px;
+      color: rgba(255,255,255,0.45);   /* --fg-muted */
     }
 
     /* ── Loading skeleton ── */
-    .skel-primary   { height: 190px; }
-    .skel-secondary { height: 100px; }
+    .skel-primary   { height: 172px; border-radius: 3px; }
+    .skel-secondary { height: 100px; border-radius: 3px; }
     .skel-primary, .skel-secondary {
       background: rgba(255,255,255,0.10);
       animation: df-pulse 1.6s ease-in-out infinite;
     }
     @keyframes df-pulse { 0%,100% { opacity:.3 } 50% { opacity:.7 } }
 
-    /* ── Error / no-key state ── */
+    /* ── Error / no-key ── */
     .error-wrap {
-      height: 398px;
+      height: 396px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       gap: 14px;
-      padding: 24px;
+      padding: 0 24px;
       text-align: center;
     }
     .error-icon { font-size: 28px; opacity: 0.6; }
@@ -529,7 +563,7 @@ function buildStyles(color) {
   `;
 }
 
-// ─── Render Functions ──────────────────────────────────────────
+// ─── Render ────────────────────────────────────────────────────
 
 function renderLoading() {
   return `
@@ -540,43 +574,35 @@ function renderLoading() {
 }
 
 function renderError(message) {
-  const noKey = message === 'NO_API_KEY';
   return `
     <div class="error-wrap">
-      <div class="error-icon">${noKey ? '🔑' : '⚡'}</div>
-      <p class="error-msg">${
-        noKey
-          ? 'Add your Google AI API key via the De.fault toolbar icon to get started.'
-          : esc(message)
-      }</p>
-      ${!noKey ? '<button class="btn-retry">Try again</button>' : ''}
+      <div class="error-icon">⚡</div>
+      <p class="error-msg">${esc(message)}</p>
+      <button class="btn-retry">Try again</button>
     </div>
   `;
 }
 
 function renderCard(s, isPrimary, idx) {
-  const imgW  = isPrimary ? 160 : 130;
-  const imgH  = isPrimary ? 190 : 100;
   const type  = (s.type || 'ARTICLE').toUpperCase();
-  const icon  = ICONS[type] || ICONS.ARTICLE;
+  const micon = MEDIUM_ICONS[type] || MEDIUM_ICONS.ARTICLE;
+  const size  = isPrimary ? 172 : 100;
 
   return `
     <div class="card ${isPrimary ? 'card-primary' : 'card-secondary'}">
       <img class="card-img"
-           src="${imgUrl(s.imageQuery || s.title, imgW, imgH, idx)}"
+           src="${imgUrl(s.imageQuery || s.title, size, idx)}"
            alt=""
            loading="${isPrimary ? 'eager' : 'lazy'}"
            onerror="this.style.opacity='0'">
       <div class="card-body">
         <div class="eyebrow">
-          <span class="eyebrow-left">
-            <span class="type-icon">${icon}</span>
-            <span class="type-label">${esc(type)}</span>
-            <span class="eyebrow-rule"> | </span>
-            <span class="source-name">${esc(s.source)}</span>
-          </span>
-          <button class="btn-bookmark" data-idx="${idx}" title="Save">
-            ${BOOKMARK_ICON}
+          <span class="medium-icon">${micon}</span>
+          <span class="type-label">${esc(type)}</span>
+          <span class="eyebrow-rule"></span>
+          <span class="source-name">${esc(s.source)}</span>
+          <button class="btn-save" data-idx="${idx}" title="Save">
+            ${ICON_SAVE}
           </button>
         </div>
         <p class="card-title">${esc(s.title)}</p>
@@ -600,7 +626,6 @@ function mount(session) {
 
   host = document.createElement('div');
   host.id = 'de-fault-root';
-  // Fixed: bottom-right, above everything
   host.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:2147483647;';
 
   shadow = host.attachShadow({ mode: 'open' });
@@ -608,12 +633,12 @@ function mount(session) {
     <style>${buildStyles(session.color)}</style>
     <div class="popup" id="popup">
       <div class="controls">
-        <button class="btn-ctrl" id="btnMin" title="Minimize">—</button>
-        <button class="btn-ctrl" id="btnClose" title="Close">✕</button>
+        <button class="btn-ctrl" id="btnShrink" title="Minimize">${ICON_SHRINK}</button>
+        <button class="btn-ctrl" id="btnClose"  title="Close">${ICON_CLOSE}</button>
       </div>
       <div class="header">
         <h1 class="headline" id="headline">${esc(session.headline)}</h1>
-        <button class="btn-refresh" id="btnRefresh" title="New angle">↻</button>
+        <button class="btn-refresh" id="btnRefresh" title="New angle">${ICON_REDO}</button>
       </div>
       <div class="cards" id="cards">${renderLoading()}</div>
       <div class="footer">
@@ -627,15 +652,14 @@ function mount(session) {
 
   const $ = (id) => shadow.getElementById(id);
 
-  $('btnMin').addEventListener('click', () => {
-    const minimized = $('popup').classList.toggle('minimized');
-    $('btnMin').textContent = minimized ? '+' : '—';
+  $('btnShrink').addEventListener('click', () => {
+    const min = $('popup').classList.toggle('minimized');
+    $('btnShrink').innerHTML = min ? ICON_REDO : ICON_SHRINK; // swap icon hint
+    $('btnShrink').title = min ? 'Expand' : 'Minimize';
   });
 
   $('btnClose').addEventListener('click', () => {
-    host.remove();
-    host = null;
-    shadow = null;
+    host.remove(); host = null; shadow = null;
   });
 
   $('btnRefresh').addEventListener('click', handleRefresh);
@@ -654,14 +678,12 @@ async function handleRefresh() {
   const btn = shadow?.getElementById('btnRefresh');
   if (!btn) return;
 
-  // Spin animation (remove + re-add to restart)
   btn.classList.remove('spin');
-  void btn.offsetWidth;
+  void btn.offsetWidth;            // reflow to restart animation
   btn.classList.add('spin');
   setTimeout(() => btn.classList.remove('spin'), 500);
 
   appState.ctIndex = rotateCT(appState.ctIndex);
-
   const hl = pick(HEADLINES);
   sessionStorage.setItem(SK.hl, hl);
   if (shadow) shadow.getElementById('headline').textContent = hl;
@@ -670,14 +692,12 @@ async function handleRefresh() {
 }
 
 function handleCardsClick(e) {
-  if (e.target.closest('.btn-retry')) {
-    loadSuggestions();
-    return;
-  }
-  const bm = e.target.closest('.btn-bookmark');
-  if (bm) {
-    const saved = bm.classList.toggle('saved');
-    bm.innerHTML = saved ? BOOKMARK_SAVED_ICON : BOOKMARK_ICON;
+  if (e.target.closest('.btn-retry')) { loadSuggestions(); return; }
+
+  const saveBtn = e.target.closest('.btn-save');
+  if (saveBtn) {
+    const saved = saveBtn.classList.toggle('saved');
+    saveBtn.innerHTML = saved ? ICON_SAVE_ACTIVE : ICON_SAVE;
   }
 }
 
@@ -685,7 +705,6 @@ function handleCardsClick(e) {
 
 async function loadSuggestions() {
   setCards(renderLoading());
-
   const ct   = CONTENT_TYPES[appState.ctIndex];
   const resp = await chrome.runtime.sendMessage({
     type: 'FETCH_SUGGESTIONS',
@@ -695,7 +714,6 @@ async function loadSuggestions() {
       contentTypeDesc: ct.desc
     }
   });
-
   setCards(resp.ok ? renderSuggestions(resp.data) : renderError(resp.error));
 }
 
@@ -705,7 +723,7 @@ async function boot() {
   const pageCtx = getPageContext();
   if (!pageCtx) return;
 
-  const session  = initSession();
+  const session = initSession();
   appState = {
     context:  pageCtx.context,
     intent:   detectIntent(pageCtx.context),
@@ -713,25 +731,13 @@ async function boot() {
     color:    session.color
   };
 
-  // Give the page 2.2s to settle before appearing
   await new Promise(r => setTimeout(r, 2200));
-
-  // Abort if user navigated away during wait
   if (!getPageContext()) return;
 
-  const { hasKey } = await chrome.runtime.sendMessage({ type: 'CHECK_API_KEY' });
-
   mount(session);
-
-  if (!hasKey) {
-    setCards(renderError('NO_API_KEY'));
-    return;
-  }
-
   await loadSuggestions();
 }
 
-// Guard against double-injection on SPA route changes
 if (!window.__dfLoaded) {
   window.__dfLoaded = true;
   boot();

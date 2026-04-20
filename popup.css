@@ -1,199 +1,129 @@
-/* popup.css — Settings page for De.fault extension
-   Uses design-system tokens from tokens.css            */
+/* popup.css — De.fault extension info popup
+   Dark brand surface, uses tokens.css design system tokens */
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  width: 320px;
-  min-height: 100%;
-  background: rgb(0, 0, 0);     /* --df-black */
-  color: rgb(255, 255, 255);    /* --fg-1 */
+  width: 300px;
+  background: rgb(0,0,0);
+  color: rgb(255,255,255);
   font-family: "Barlow", system-ui, sans-serif;
-  font-size: 12px;
   -webkit-font-smoothing: antialiased;
 }
 
 .container {
   display: flex;
   flex-direction: column;
-  min-height: 420px;
 }
 
-/* ── Header ── */
-.header {
-  padding: 20px 20px 14px;
-  border-bottom: 1px solid rgba(255,255,255,0.10);
+/* ── Card-style header — uses a random mood color ── */
+.card-header {
+  padding: 22px 20px 16px;
+  background: rgb(0,70,189);   /* --blue-1 as default header mood */
+  position: relative;
 }
 
 .logo {
   font-family: "David Libre", Georgia, serif;
   font-weight: 400;
-  font-size: 28px;
+  font-size: 32px;
   line-height: 1.1;
   color: rgb(255,255,255);
   letter-spacing: 0.002em;
 }
 
 .tagline {
-  margin-top: 3px;
+  margin-top: 4px;
   font-size: 10px;
-  color: rgba(255,255,255,0.45);
-  letter-spacing: 0.04em;
+  color: rgba(255,255,255,0.60);
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
-/* ── Main ── */
+/* ── Main body ── */
 .main {
-  padding: 20px;
+  padding: 18px 20px 20px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  flex: 1;
+  gap: 16px;
 }
 
-.section { display: flex; flex-direction: column; gap: 6px; }
-
-.label {
-  font-size: 10px;
-  font-weight: 600;
-  color: rgba(255,255,255,0.70);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-/* ── Input ── */
-.input-wrap {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.input {
-  width: 100%;
-  padding: 9px 38px 9px 12px;
-  background: rgb(17,17,17);    /* --df-ink-dark */
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 6px;
-  font-family: "Barlow", monospace;
-  font-size: 12px;
-  color: rgb(255,255,255);
-  outline: none;
-  transition: border-color 120ms ease;
-}
-.input:focus { border-color: rgba(255,255,255,0.40); }
-.input::placeholder { color: rgba(255,255,255,0.25); }
-
-.toggle-btn {
-  position: absolute;
-  right: 10px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: rgba(255,255,255,0.40);
-  padding: 0;
-  display: flex;
-  align-items: center;
-  transition: color 120ms ease;
-}
-.toggle-btn:hover { color: rgba(255,255,255,0.80); }
-
-.hint {
-  font-size: 11px;
-  color: rgba(255,255,255,0.40);
-  line-height: 1.5;
-}
-
-/* ── Status banner ── */
-.status {
-  padding: 9px 12px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 600;
-}
-.status.success {
-  background: rgba(0,118,50,0.25);   /* green-1 tint */
-  color: rgb(0,164,69);              /* green-2 */
-  border: 1px solid rgba(0,118,50,0.40);
-}
-.status.error {
-  background: rgba(142,30,30,0.25);  /* red-1 tint */
-  color: rgb(255,120,120);
-  border: 1px solid rgba(142,30,30,0.40);
-}
-.hidden { display: none !important; }
-
-/* ── Save button ── */
-.save-btn {
-  width: 100%;
-  padding: 10px;
-  background: rgb(255,255,255);
-  color: rgb(0,0,0);
-  border: none;
-  border-radius: 999px;              /* --r-pill */
-  font-family: "Barlow", sans-serif;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  cursor: pointer;
-  transition: opacity 120ms ease, transform 120ms ease;
-}
-.save-btn:hover  { opacity: 0.90; }
-.save-btn:active { transform: scale(0.97); }
-
-/* ── Active key indicator ── */
-.key-status {
+.status-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
-  background: rgb(17,17,17);
-  border-radius: 6px;
-  border: 1px solid rgba(255,255,255,0.08);
 }
-.key-dot {
+
+.dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: rgb(0,164,69);  /* green-2 */
   flex-shrink: 0;
 }
-#keyStatusText {
-  flex: 1;
-  font-size: 10px;
-  color: rgba(255,255,255,0.55);
-  font-family: monospace;
-  letter-spacing: 0.02em;
+.dot-active  { background: rgb(0,164,69); }  /* --green-2 */
+.dot-inactive { background: rgba(255,255,255,0.30); }
+
+.status-text {
+  font-size: 12px;
+  color: rgba(255,255,255,0.70);
 }
-.clear-btn {
-  background: none;
-  border: none;
+
+.desc {
+  font-size: 12px;
+  color: rgba(255,255,255,0.60);
+  line-height: 1.55;
+}
+
+/* ── How it works — 3-step row ── */
+.how-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  background: rgb(17,17,17);
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.07);
+}
+
+.how-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.how-num {
   font-size: 10px;
   font-weight: 600;
-  color: rgba(255,255,255,0.40);
-  cursor: pointer;
-  font-family: "Barlow", sans-serif;
-  letter-spacing: 0.04em;
-  transition: color 120ms ease;
-  padding: 0;
+  color: rgba(255,255,255,0.30);
+  letter-spacing: 0.08em;
+  flex-shrink: 0;
+  width: 20px;
 }
-.clear-btn:hover { color: rgb(255,120,120); }
 
-/* ── Footer bar ── */
+.how-text {
+  font-size: 11px;
+  color: rgba(255,255,255,0.55);
+}
+
+/* ── Footer ── */
 .bottom-bar {
-  padding: 13px 20px;
+  padding: 12px 20px 14px;
   border-top: 1px solid rgba(255,255,255,0.08);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  color: rgba(255,255,255,0.35);
-  font-size: 10px;
 }
 
-.get-key-link {
-  font-size: 10px;
-  font-weight: 600;
-  color: rgba(255,255,255,0.55);
+.df-link {
+  font-family: "Barlow", sans-serif;
+  font-size: 11px;
+  color: rgba(255,255,255,0.50);
   text-decoration: none;
   transition: color 120ms ease;
 }
-.get-key-link:hover { color: rgb(255,255,255); }
+.df-link:hover { color: rgb(255,255,255); }
+
+.df-footer {
+  font-size: 10px;
+  color: rgba(255,255,255,0.25);
+}

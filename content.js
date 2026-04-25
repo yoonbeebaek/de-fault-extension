@@ -212,9 +212,9 @@ const ICON_SHRINK = `<svg width="15" height="15" viewBox="0 0 15 15" fill="curre
   <path d="M7.5 0a7.5 7.5 0 110 15 7.5 7.5 0 010-15zM4.17 6.9a.6.6 0 100 1.2h6.66a.6.6 0 100-1.2z"/>
 </svg>`;
 
-// DfIcon redo — 44px FAB, icon rendered inside at ~20px
-const ICON_REDO = `<svg width="22" height="22" viewBox="0 0 26 26" fill="currentColor">
-  <path d="M13 2 a11 11 0 1 1 -10 14 l2 -.7 a9 9 0 1 0 8.5 -12 L14 6 L10 3 L14 0Z"/>
+// DfIcon redo — Material refresh icon path
+const ICON_REDO = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+  <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4a8 8 0 0 0-8 8 8 8 0 0 0 8 8c3.73 0 6.84-2.55 7.73-6h-2.08A6 6 0 0 1 12 18a6 6 0 0 1-6-6 6 6 0 0 1 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
 </svg>`;
 
 // DfIcon save — bookmark ribbon, 10×10 for eyebrow
@@ -717,11 +717,30 @@ async function loadSuggestions() {
   setCards(resp.ok ? renderSuggestions(resp.data) : renderError(resp.error));
 }
 
+// ─── Frequency throttle — once per origin per hour ─────────────
+
+const COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
+
+function shouldShowOverlay() {
+  try {
+    const key  = `df-shown-${window.location.origin}`;
+    const last = localStorage.getItem(key);
+    return !last || Date.now() - parseInt(last, 10) > COOLDOWN_MS;
+  } catch { return true; }
+}
+
+function markShown() {
+  try {
+    localStorage.setItem(`df-shown-${window.location.origin}`, Date.now());
+  } catch {}
+}
+
 // ─── Boot ──────────────────────────────────────────────────────
 
 async function boot() {
   const pageCtx = getPageContext();
   if (!pageCtx) return;
+  if (!shouldShowOverlay()) return;
 
   const session = initSession();
   appState = {
@@ -731,10 +750,11 @@ async function boot() {
     color:    session.color
   };
 
-  await new Promise(r => setTimeout(r, 2200));
+  await new Promise(r => setTimeout(r, 4000));
   if (!getPageContext()) return;
 
   mount(session);
+  markShown();
   await loadSuggestions();
 }
 

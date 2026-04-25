@@ -1,13 +1,6 @@
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
-
-// API key is stored in chrome.storage.local — never hardcoded in source.
-// Inject once via DevTools console on the extension's service worker:
-//   chrome.storage.local.set({ apiKey: 'AIza...' })
-
-async function getApiKey() {
-  const { apiKey } = await chrome.storage.local.get('apiKey');
-  return (apiKey && apiKey.trim()) ? apiKey.trim() : null;
-}
+// De.fault — background service worker
+// Uses Chrome's built-in on-device AI (Gemini Nano via window.ai Prompt API).
+// No API key required. Requires Chrome 127+.
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'FETCH_SUGGESTIONS') {
@@ -16,69 +9,63 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .catch(err => sendResponse({ ok: false, error: err.message }));
     return true;
   }
-
-  if (message.type === 'CHECK_API_KEY') {
-    sendResponse({ hasKey: true }); // always ready
-    return true;
-  }
 });
 
 async function fetchSuggestions({ context, intent, contentTypeDesc, disciplineKey, disciplineDesc }) {
-  const apiKey = await getApiKey();
-  if (!apiKey) throw new Error('No API key set. Open the service worker console and run:\nchrome.storage.local.set({ apiKey: "AIza..." })');
+  if (!('ai' in self) || !('languageModel' in self.ai)) {
+    throw new Error('Chrome built-in AI not found. Update Chrome to version 127 or later.');
+  }
 
-  const response = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: buildPrompt(context, intent, contentTypeDesc, disciplineKey, disciplineDesc) }] }],
-      generationConfig: {
-        responseMimeType: 'application/json',
-        temperature: 0.85,
-        maxOutputTokens: 1024
-      }
-    })
+  const { available } = await self.ai.languageModel.capabilities();
+  if (available === 'no') {
+    throw new Error('On-device AI is not supported on this hardware.');
+  }
+  // 'after-download' means the model is downloading — create() will wait for it
+
+  const session = await self.ai.languageModel.create({
+    systemPrompt:
+      'You are De.fault, a de-personalization engine. ' +
+      'You respond ONLY with a valid JSON array — no markdown, no explanation, just the raw JSON.',
+    temperature: 0.9,
+    topK: 40
   });
 
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err?.error?.message || `API error ${response.status}`);
+  let text;
+  try {
+    text = await session.prompt(buildPrompt(context, intent, contentTypeDesc, disciplineKey, disciplineDesc));
+  } finally {
+    session.destroy();
   }
 
-  const data = await response.json();
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) throw new Error('Empty response from Gemini');
+  // Extract outermost JSON array from response
+  const start = text.indexOf('[');
+  const end   = text.lastIndexOf(']');
+  if (start === -1 || end === -1) throw new Error('AI response did not contain a JSON array');
 
-  const suggestions = JSON.parse(text);
+  const suggestions = JSON.parse(text.slice(start, end + 1));
   if (!Array.isArray(suggestions) || suggestions.length === 0) {
-    throw new Error('No suggestions returned');
+    throw new Error('No suggestions in AI response');
   }
-
   return suggestions.slice(0, 3);
 }
 
 function buildPrompt(context, intent, contentTypeDesc, disciplineKey, disciplineDesc) {
-  return `You are De.fault, a de-personalization engine. Your mission is to surface what lies UNDER or AROUND a topic — not to confirm what the user already knows.
-
-The user is browsing about: "${context}"
-Detected curiosity intent: "${intent}"
-
-Content angle to explore: ${contentTypeDesc}
-
+  return `The user is browsing: "${context}"
+Curiosity intent: "${intent}"
+Content angle: ${contentTypeDesc}
 Disciplinary lens — ${disciplineKey}: ${disciplineDesc}
 
-Generate exactly 3 real content suggestions (real articles, videos, or podcasts from well-known publishers) that illuminate "${context}" from the ${disciplineKey} disciplinary perspective through the above angle. Each suggestion should feel genuinely unexpected — something the user would never encounter in a personalized feed, yet meaningfully connected.
+Return a JSON array of exactly 3 real content suggestions from well-known publishers that explore "${context}" through the ${disciplineKey} lens. Make them unexpected and perspective-expanding — things the user would never find in a personalized feed.
 
-Return a JSON array with exactly 3 objects:
 [
   {
-    "title": "Title of the real content piece",
+    "title": "Exact article or video title",
     "source": "Publisher or channel name",
     "type": "ARTICLE",
-    "description": "One sentence on why this piece expands perspective through the ${disciplineKey} lens",
+    "description": "One sentence on why this expands perspective",
     "imageQuery": "3-4 word visual theme"
   }
 ]
 
-Use "ARTICLE", "VIDEO", or "AUDIO" for type. Vary types when possible.`;
+Use ARTICLE, VIDEO, or AUDIO for type. Vary types. Output the JSON array only.`;
 }

@@ -717,22 +717,60 @@ async function loadSuggestions() {
   setCards(resp.ok ? renderSuggestions(resp.data) : renderError(resp.error));
 }
 
-// ─── Frequency throttle — once per origin per hour ─────────────
+// ─── Context relevance gate ────────────────────────────────────
+//
+//  Only trigger when the page has a meaningful, discussable context:
+//  controversial / viral / opinion-laden topics, news, or social media.
+//  Pure how-to / product lookup / entertainment browsing = skip.
 
-const COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
+const TRIGGER_DOMAINS = [
+  'nytimes.com','bbc.com','bbc.co.uk','theguardian.com','washingtonpost.com',
+  'reuters.com','apnews.com','cnn.com','foxnews.com','nbcnews.com',
+  'abcnews.go.com','cbsnews.com','politico.com','theatlantic.com','bloomberg.com',
+  'slate.com','vox.com','huffpost.com','vice.com','wired.com','economist.com',
+  'ft.com','wsj.com','thetimes.co.uk','lemonde.fr','spiegel.de',
+  'reddit.com','twitter.com','x.com','threads.net',
+  'medium.com','substack.com'
+];
 
-function shouldShowOverlay() {
-  try {
-    const key  = `df-shown-${window.location.origin}`;
-    const last = localStorage.getItem(key);
-    return !last || Date.now() - parseInt(last, 10) > COOLDOWN_MS;
-  } catch { return true; }
-}
+const TRIGGER_KEYWORDS = [
+  // controversy / conflict
+  'controversial','controversy','scandal','crisis','protest','riot','ban','banned',
+  'censored','lawsuit','lawsuit','arrested','charged','accused','exposed',
+  'leaked','fired','resign','impeach','recall','outrage',
+  // viral / breaking
+  'viral','trending','breaking','exclusive','just in',
+  // debate / opinion
+  'vs','versus','better than','worse than','overrated','underrated',
+  'unpopular opinion','hot take','why everyone','nobody talks about',
+  'the problem with','should we','is it okay','do we need',
+  // politics / society flash points
+  'election','vote','policy','government','rights','inequality','racism',
+  'sexism','climate change','war','conflict','inflation','recession',
+  'misinformation','deepfake','privacy','surveillance','censorship',
+  // tech / culture flash points
+  'ai replacing','layoffs','strike','boycott','cancel culture','cancelled',
+  'open letter','letter to','response to','backlash','accused of',
+];
 
-function markShown() {
-  try {
-    localStorage.setItem(`df-shown-${window.location.origin}`, Date.now());
-  } catch {}
+const TRIGGER_INTENTS = new Set([
+  "I'm browsing for emerging trends and perspectives",
+  "I'm here to dig deeper and decide",
+]);
+
+function isContextTriggerable(context, intent) {
+  // Always on news / social / opinion domains
+  const host = window.location.hostname;
+  if (TRIGGER_DOMAINS.some(d => host.endsWith(d) || host === d)) return true;
+
+  // Intent already classified as debate or trend browsing
+  if (TRIGGER_INTENTS.has(intent)) return true;
+
+  // Context contains controversy / viral signals
+  const lc = context.toLowerCase();
+  if (TRIGGER_KEYWORDS.some(kw => lc.includes(kw))) return true;
+
+  return false;
 }
 
 // ─── Boot ──────────────────────────────────────────────────────
@@ -740,12 +778,14 @@ function markShown() {
 async function boot() {
   const pageCtx = getPageContext();
   if (!pageCtx) return;
-  if (!shouldShowOverlay()) return;
+
+  const intent = detectIntent(pageCtx.context);
+  if (!isContextTriggerable(pageCtx.context, intent)) return;
 
   const session = initSession();
   appState = {
     context:  pageCtx.context,
-    intent:   detectIntent(pageCtx.context),
+    intent,
     ctIndex:  session.ctIndex,
     color:    session.color
   };
@@ -754,7 +794,6 @@ async function boot() {
   if (!getPageContext()) return;
 
   mount(session);
-  markShown();
   await loadSuggestions();
 }
 

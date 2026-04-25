@@ -16,10 +16,10 @@ body {
   flex-direction: column;
 }
 
-/* ── Card-style header — uses a random mood color ── */
+/* ── Header — full black, consistent with body ── */
 .card-header {
   padding: 22px 20px 16px;
-  background: rgb(0,70,189);   /* --blue-1 as default header mood */
+  background: rgb(0,0,0);
   position: relative;
 }
 

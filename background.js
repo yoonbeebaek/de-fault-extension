@@ -1,6 +1,7 @@
 // De.fault — background service worker
-// Uses Chrome's built-in on-device AI (Gemini Nano via window.ai Prompt API).
-// No API key required. Requires Chrome 127+.
+// Uses Pollinations.ai text API — free, no API key, no user setup required.
+
+const POLLINATIONS_URL = 'https://text.pollinations.ai/';
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'FETCH_SUGGESTIONS') {
@@ -12,39 +13,40 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 async function fetchSuggestions({ context, intent, contentTypeDesc, disciplineKey, disciplineDesc }) {
-  if (!('ai' in self) || !('languageModel' in self.ai)) {
-    throw new Error('Chrome built-in AI not found. Update Chrome to version 127 or later.');
-  }
-
-  const { available } = await self.ai.languageModel.capabilities();
-  if (available === 'no') {
-    throw new Error('On-device AI is not supported on this hardware.');
-  }
-  // 'after-download' means the model is downloading — create() will wait for it
-
-  const session = await self.ai.languageModel.create({
-    systemPrompt:
-      'You are De.fault, a de-personalization engine. ' +
-      'You respond ONLY with a valid JSON array — no markdown, no explanation, just the raw JSON.',
-    temperature: 0.9,
-    topK: 40
+  const response = await fetch(POLLINATIONS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You are De.fault, a de-personalization engine. ' +
+            'You respond ONLY with a valid JSON array — no markdown fences, no explanation, just the raw JSON.'
+        },
+        {
+          role: 'user',
+          content: buildPrompt(context, intent, contentTypeDesc, disciplineKey, disciplineDesc)
+        }
+      ],
+      model: 'openai',
+      jsonMode: true,
+      temperature: 0.85,
+      seed: Math.floor(Math.random() * 99999)
+    })
   });
 
-  let text;
-  try {
-    text = await session.prompt(buildPrompt(context, intent, contentTypeDesc, disciplineKey, disciplineDesc));
-  } finally {
-    session.destroy();
-  }
+  if (!response.ok) throw new Error(`Request failed (${response.status})`);
 
-  // Extract outermost JSON array from response
+  const text = await response.text();
+
   const start = text.indexOf('[');
   const end   = text.lastIndexOf(']');
-  if (start === -1 || end === -1) throw new Error('AI response did not contain a JSON array');
+  if (start === -1 || end === -1) throw new Error('No JSON array in response');
 
   const suggestions = JSON.parse(text.slice(start, end + 1));
   if (!Array.isArray(suggestions) || suggestions.length === 0) {
-    throw new Error('No suggestions in AI response');
+    throw new Error('Empty suggestions from AI');
   }
   return suggestions.slice(0, 3);
 }
@@ -55,7 +57,7 @@ Curiosity intent: "${intent}"
 Content angle: ${contentTypeDesc}
 Disciplinary lens — ${disciplineKey}: ${disciplineDesc}
 
-Return a JSON array of exactly 3 real content suggestions from well-known publishers that explore "${context}" through the ${disciplineKey} lens. Make them unexpected and perspective-expanding — things the user would never find in a personalized feed.
+Return a JSON array of exactly 3 real content suggestions from well-known publishers that explore "${context}" through the ${disciplineKey} lens. Make them unexpected — things never found in a personalized feed, yet meaningfully connected.
 
 [
   {

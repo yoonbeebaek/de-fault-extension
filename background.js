@@ -1,6 +1,6 @@
 // De.fault — background service worker
 // API key lives in _config.js (gitignored) — never in source control.
-importScripts('_config.js');
+importScripts('config.js');
 
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 

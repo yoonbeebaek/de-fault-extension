@@ -22,14 +22,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-async function fetchSuggestions({ context, intent, contentTypeDesc }) {
+async function fetchSuggestions({ context, intent, contentTypeDesc, disciplineKey, disciplineDesc }) {
   const apiKey = await getApiKey();
 
   const response = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: buildPrompt(context, intent, contentTypeDesc) }] }],
+      contents: [{ parts: [{ text: buildPrompt(context, intent, contentTypeDesc, disciplineKey, disciplineDesc) }] }],
       generationConfig: {
         responseMimeType: 'application/json',
         temperature: 0.85,
@@ -55,14 +55,17 @@ async function fetchSuggestions({ context, intent, contentTypeDesc }) {
   return suggestions.slice(0, 3);
 }
 
-function buildPrompt(context, intent, contentTypeDesc) {
-  return `You are De.fault, a de-personalization engine. Your mission is to expand perspective — not confirm it.
+function buildPrompt(context, intent, contentTypeDesc, disciplineKey, disciplineDesc) {
+  return `You are De.fault, a de-personalization engine. Your mission is to surface what lies UNDER or AROUND a topic — not to confirm what the user already knows.
 
-The user is currently browsing about: "${context}"
-Detected user intent: "${intent}"
-Explore this angle: "${contentTypeDesc}"
+The user is browsing about: "${context}"
+Detected curiosity intent: "${intent}"
 
-Generate exactly 3 real content suggestions (real articles, videos, or podcasts from well-known publishers) at the intersection of this intent and content angle. Prioritize genuinely unexpected but meaningfully adjacent content the user would never encounter in a personalized feed.
+Content angle to explore: ${contentTypeDesc}
+
+Disciplinary lens — ${disciplineKey}: ${disciplineDesc}
+
+Generate exactly 3 real content suggestions (real articles, videos, or podcasts from well-known publishers) that illuminate "${context}" from the ${disciplineKey} disciplinary perspective through the above angle. Each suggestion should feel genuinely unexpected — something the user would never encounter in a personalized feed, yet meaningfully connected.
 
 Return a JSON array with exactly 3 objects:
 [
@@ -70,7 +73,7 @@ Return a JSON array with exactly 3 objects:
     "title": "Title of the real content piece",
     "source": "Publisher or channel name",
     "type": "ARTICLE",
-    "description": "One sentence on why this expands perspective",
+    "description": "One sentence on why this piece expands perspective through the ${disciplineKey} lens",
     "imageQuery": "3-4 word visual theme"
   }
 ]

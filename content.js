@@ -557,9 +557,39 @@ function buildStyles(color) {
     }
     .btn-retry:hover { background: rgba(255,255,255,0.25); }
 
-    /* ── Minimized ── */
-    .popup.minimized .cards,
-    .popup.minimized .footer { display: none; }
+    /* ── Floating action button (collapsed state) ── */
+    .df-fab {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: rgb(17,17,17);
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.45), 0 1px 3px rgba(0,0,0,0.30);
+      transition: transform 140ms ease, box-shadow 140ms ease;
+    }
+    .df-fab:hover {
+      transform: scale(1.08);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.55), 0 2px 6px rgba(0,0,0,0.30);
+    }
+    .df-fab:active { transform: scale(0.95); }
+    .fab-logo {
+      font-family: "David Libre", Georgia, serif;
+      font-size: 17px;
+      font-weight: 400;
+      color: rgb(255,255,255);
+      line-height: 1;
+      letter-spacing: -0.02em;
+      user-select: none;
+      pointer-events: none;
+    }
+    @keyframes df-fab-in {
+      from { opacity: 0; transform: scale(0.55); }
+      to   { opacity: 1; transform: scale(1); }
+    }
   `;
 }
 
@@ -631,6 +661,11 @@ function mount(session) {
   shadow = host.attachShadow({ mode: 'open' });
   shadow.innerHTML = `
     <style>${buildStyles(session.color)}</style>
+
+    <button class="df-fab" id="btnFab" title="De.fault — expand" style="display:none">
+      <span class="fab-logo">df</span>
+    </button>
+
     <div class="popup" id="popup">
       <div class="controls">
         <button class="btn-ctrl" id="btnShrink" title="Minimize">${ICON_SHRINK}</button>
@@ -653,9 +688,21 @@ function mount(session) {
   const $ = (id) => shadow.getElementById(id);
 
   $('btnShrink').addEventListener('click', () => {
-    const min = $('popup').classList.toggle('minimized');
-    $('btnShrink').innerHTML = min ? ICON_REDO : ICON_SHRINK; // swap icon hint
-    $('btnShrink').title = min ? 'Expand' : 'Minimize';
+    $('popup').style.display = 'none';
+    const fab = $('btnFab');
+    fab.style.display = 'flex';
+    fab.style.animation = 'none';
+    void fab.offsetWidth;
+    fab.style.animation = 'df-fab-in 260ms cubic-bezier(0.22,1,0.36,1)';
+  });
+
+  $('btnFab').addEventListener('click', () => {
+    $('btnFab').style.display = 'none';
+    const popup = $('popup');
+    popup.style.display = '';
+    popup.style.animation = 'none';
+    void popup.offsetWidth;
+    popup.style.animation = 'df-in 300ms cubic-bezier(0.22,1,0.36,1)';
   });
 
   $('btnClose').addEventListener('click', () => {

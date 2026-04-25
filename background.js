@@ -38,17 +38,37 @@ async function fetchSuggestions({ context, intent, contentTypeDesc, disciplineKe
 
   if (!response.ok) throw new Error(`Request failed (${response.status})`);
 
-  const text = await response.text();
+  let text = await response.text();
 
+  // Pollinations may wrap in OpenAI chat-completion format
+  try {
+    const obj = JSON.parse(text);
+    if (obj?.choices?.[0]?.message?.content) {
+      text = obj.choices[0].message.content;
+    } else if (Array.isArray(obj)) {
+      return validated(obj);
+    }
+  } catch {}
+
+  // Strip markdown code fences if present
+  text = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+
+  // Extract outermost JSON array
   const start = text.indexOf('[');
   const end   = text.lastIndexOf(']');
-  if (start === -1 || end === -1) throw new Error('No JSON array in response');
-
-  const suggestions = JSON.parse(text.slice(start, end + 1));
-  if (!Array.isArray(suggestions) || suggestions.length === 0) {
-    throw new Error('Empty suggestions from AI');
+  if (start !== -1 && end !== -1) {
+    try { return validated(JSON.parse(text.slice(start, end + 1))); } catch {}
   }
-  return suggestions.slice(0, 3);
+
+  // Last resort: try parsing the whole cleaned text
+  try { return validated(JSON.parse(text)); } catch {}
+
+  throw new Error('Could not parse AI response — try again');
+}
+
+function validated(arr) {
+  if (!Array.isArray(arr) || arr.length === 0) throw new Error('Empty suggestions from AI');
+  return arr.slice(0, 3);
 }
 
 function buildPrompt(context, intent, contentTypeDesc, disciplineKey, disciplineDesc) {

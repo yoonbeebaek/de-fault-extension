@@ -1,7 +1,8 @@
 // De.fault — background service worker
-// Uses Pollinations.ai text API — free, no API key, no user setup required.
+// API key lives in _config.js (gitignored) — never in source control.
+importScripts('_config.js');
 
-const POLLINATIONS_URL = 'https://text.pollinations.ai/';
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'FETCH_SUGGESTIONS') {
@@ -13,72 +14,46 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 async function fetchSuggestions({ context, intent, contentTypeDesc, disciplineKey, disciplineDesc }) {
-  const response = await fetch(POLLINATIONS_URL, {
+  const response = await fetch(`${GEMINI_URL}?key=${GEMINI_KEY}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      messages: [
-        {
-          role: 'system',
-          content:
-            'You are De.fault, a de-personalization engine. ' +
-            'You respond ONLY with a valid JSON array — no markdown fences, no explanation, just the raw JSON.'
-        },
-        {
-          role: 'user',
-          content: buildPrompt(context, intent, contentTypeDesc, disciplineKey, disciplineDesc)
-        }
-      ],
-      model: 'openai',
-      jsonMode: true,
-      temperature: 0.85,
-      seed: Math.floor(Math.random() * 99999)
+      contents: [{ parts: [{ text: buildPrompt(context, intent, contentTypeDesc, disciplineKey, disciplineDesc) }] }],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        temperature: 0.85,
+        maxOutputTokens: 1024
+      }
     })
   });
 
-  if (!response.ok) throw new Error(`Request failed (${response.status})`);
-
-  let text = await response.text();
-
-  // Pollinations may wrap in OpenAI chat-completion format
-  try {
-    const obj = JSON.parse(text);
-    if (obj?.choices?.[0]?.message?.content) {
-      text = obj.choices[0].message.content;
-    } else if (Array.isArray(obj)) {
-      return validated(obj);
-    }
-  } catch {}
-
-  // Strip markdown code fences if present
-  text = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
-
-  // Extract outermost JSON array
-  const start = text.indexOf('[');
-  const end   = text.lastIndexOf(']');
-  if (start !== -1 && end !== -1) {
-    try { return validated(JSON.parse(text.slice(start, end + 1))); } catch {}
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `API error ${response.status}`);
   }
 
-  // Last resort: try parsing the whole cleaned text
-  try { return validated(JSON.parse(text)); } catch {}
+  const data = await response.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error('Empty response from Gemini');
 
-  throw new Error('Could not parse AI response — try again');
-}
-
-function validated(arr) {
-  if (!Array.isArray(arr) || arr.length === 0) throw new Error('Empty suggestions from AI');
-  return arr.slice(0, 3);
+  const suggestions = JSON.parse(text);
+  if (!Array.isArray(suggestions) || suggestions.length === 0) {
+    throw new Error('No suggestions returned');
+  }
+  return suggestions.slice(0, 3);
 }
 
 function buildPrompt(context, intent, contentTypeDesc, disciplineKey, disciplineDesc) {
-  return `The user is browsing: "${context}"
+  return `You are De.fault, a de-personalization engine. Surface what lies UNDER or AROUND a topic — never confirm what the user already knows.
+
+The user is browsing: "${context}"
 Curiosity intent: "${intent}"
 Content angle: ${contentTypeDesc}
 Disciplinary lens — ${disciplineKey}: ${disciplineDesc}
 
-Return a JSON array of exactly 3 real content suggestions from well-known publishers that explore "${context}" through the ${disciplineKey} lens. Make them unexpected — things never found in a personalized feed, yet meaningfully connected.
+Generate exactly 3 real content suggestions (real articles, videos, or podcasts from well-known publishers) that illuminate "${context}" through the ${disciplineKey} lens. Make them genuinely unexpected — things never found in a personalized feed, yet meaningfully connected.
 
+Return a JSON array only:
 [
   {
     "title": "Exact article or video title",
@@ -89,5 +64,5 @@ Return a JSON array of exactly 3 real content suggestions from well-known publis
   }
 ]
 
-Use ARTICLE, VIDEO, or AUDIO for type. Vary types. Output the JSON array only.`;
+Use ARTICLE, VIDEO, or AUDIO for type. Vary types.`;
 }

@@ -77,13 +77,21 @@ function anglePool(intent) {
 
 // ─── Page context — any page with readable text ────────────────
 
+// Non-content path patterns — signup, about, legal, settings, etc.
+const NON_CONTENT_PATH = /^\/(about|about-us|sign[-_]?(up|in)|log[-_]?(in|out)|register|login|logout|pricing|plans|contact|contact-us|terms|tos|privacy|privacy-policy|cookie|legal|help|faq|support|careers|jobs|press|download|features|404|500|error|settings|account|profile|notifications|subscribe|unsubscribe|welcome|onboarding)(\/|$|\?)/i;
+
 function getPageContext() {
   const url  = window.location.href;
   const host = window.location.hostname;
+  const path = window.location.pathname;
 
   if (/^(chrome|chrome-extension|moz-extension|edge|about|data|file|blob):/.test(url)) return null;
   if (/^(localhost|127\.|0\.0\.0\.0)/.test(host)) return null;
   if (/\.(pdf|xml|json|csv|txt)(\?.*)?$/i.test(url)) return null;
+
+  // Skip homepages and non-content pages
+  if (path === '/' || path === '') return null;
+  if (NON_CONTENT_PATH.test(path)) return null;
 
   // Google Search
   if (/google\.[a-z.]+\/search/.test(url)) {

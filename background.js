@@ -1,7 +1,7 @@
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 // Built-in key — works out of the box. Override via chrome.storage if needed.
-const BUILT_IN_KEY = 'REDACTED_KEY_2';
+const BUILT_IN_KEY = 'REDACTED_KEY_1';
 
 async function getApiKey() {
   const { apiKey } = await chrome.storage.local.get('apiKey');

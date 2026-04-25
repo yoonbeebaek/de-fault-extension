@@ -3,8 +3,9 @@
   "name": "De.fault",
   "version": "0.2.0",
   "description": "A de-personalization engine that expands your perspective beyond the algorithmic bubble.",
-  "permissions": ["storage", "activeTab", "tabs", "aiLanguageModel"],
+  "permissions": ["storage", "activeTab", "tabs"],
   "host_permissions": [
+    "https://text.pollinations.ai/*",
     "https://picsum.photos/*"
   ],
   "background": {

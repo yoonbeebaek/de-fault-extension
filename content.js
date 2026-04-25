@@ -389,7 +389,7 @@ function buildStyles(color) {
       color: rgb(255,255,255);
       letter-spacing: 0.002em;
       width: 298px;                /* spec: w:298 */
-      max-height: 104px;           /* spec: h:104 */
+      max-height: 120px;           /* 3 lines × 40px line-height */
       overflow: hidden;
       flex-shrink: 0;
     }

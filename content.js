@@ -16,38 +16,64 @@ const HEADLINES = [
   'Hope this also motivates you.'
 ];
 
-const CONTENT_TYPES = [
-  { key: 'cause',        desc: 'the root cause — what caused this topic to exist?' },
-  { key: 'effect',       desc: 'downstream consequences — what happens because of this?' },
-  { key: 'opinion',      desc: 'contested opinions — what do people debate about this?' },
-  { key: 'backstory',    desc: 'backstory — what is the historical or origin context?' },
-  { key: 'adjacent',     desc: 'adjacent topics — what lives conceptually next to this?' },
-  { key: 'alternative',  desc: 'alternative angles — a completely different way of looking at this' },
-  { key: 'contribution', desc: 'contributing factors — what played a part in this topic existing?' },
-  { key: 'examples',     desc: 'illustrative examples — concrete real-world cases that show this in action' }
+// ─── Foucault discipline system ────────────────────────────────
+// Three epistemic lenses that shape how De.fault reframes content.
+// Each session is assigned one discipline; its color palette sets the card mood.
+// Reference: Foucault, "Discipline and Punish", Vintage Books 1995.
+
+const DISCIPLINES = [
+  {
+    key: 'linguistic',
+    desc: 'how this topic is named, framed, and contested through language, narrative, and media logic — what rhetoric or discourse shapes the way people understand it',
+    colors: ['rgb(0,70,189)','rgb(9,50,122)','rgb(1,55,147)','rgb(60,72,103)','rgb(0,67,116)']
+  },
+  {
+    key: 'economic',
+    desc: 'what systems, institutions, and power structures produce or maintain this topic — who holds power, who benefits, what capital or policy forces are at play',
+    colors: ['rgb(142,30,30)','rgb(118,57,64)','rgb(159,2,143)','rgb(164,72,20)','rgb(87,61,36)']
+  },
+  {
+    key: 'biological',
+    desc: 'how this topic intersects with bodies, health, ecology, or physical systems — what natural, scientific, or evolutionary forces operate beneath the surface',
+    colors: ['rgb(0,118,50)','rgb(5,90,18)','rgb(35,80,61)','rgb(45,78,6)','rgb(1,90,95)','rgb(67,126,140)']
+  }
 ];
 
-// Card palette — all design-system tokens, white text safe
-const SESSION_COLORS = [
-  'rgb(142,30,30)',   // --red-1
-  'rgb(118,57,64)',   // --red-3
-  'rgb(0,70,189)',    // --blue-1
-  'rgb(9,50,122)',    // --blue-2
-  'rgb(1,55,147)',    // --blue-3
-  'rgb(60,72,103)',   // --blue-4
-  'rgb(0,67,116)',    // --blue-5
-  'rgb(0,118,50)',    // --green-1
-  'rgb(5,90,18)',     // --green-3
-  'rgb(35,80,61)',    // --green-4
-  'rgb(45,78,6)',     // --green-5
-  'rgb(1,90,95)',     // --teal-1
-  'rgb(67,126,140)',  // --teal-2
-  'rgb(159,2,143)',   // --magenta
-  'rgb(164,72,20)',   // --orange-1
-  'rgb(87,61,36)',    // --brown-1
-  'rgb(88,88,88)',    // --slate-1
-  'rgb(65,64,63)'     // --slate-2
+// ─── Content angles — Under (depth) and Around (adjacency) ─────
+// Derived from the Intent × Content matrix.
+
+const UNDER_ANGLES = [
+  { key: 'cause',     desc: 'root cause — what forces, decisions, or history caused this topic to exist or emerge?' },
+  { key: 'effect',    desc: 'downstream consequences — what happens in the world because of this? Who or what is affected?' },
+  { key: 'opinion',   desc: 'contested opinions — what do people fundamentally disagree about regarding this topic?' },
+  { key: 'backstory', desc: 'backstory — what is the historical, political, or biographical origin of this?' },
 ];
+
+const AROUND_ANGLES = [
+  { key: 'adjacent',    desc: 'adjacent topics — what lives conceptually next to this, in a different but related domain?' },
+  { key: 'alternative', desc: 'alternative angles — a completely different paradigm or framework for approaching this topic' },
+  { key: 'contributor', desc: 'topics that played a part — what other forces or events contributed to making this what it is?' },
+  { key: 'examples',    desc: 'illustrative examples — concrete real-world cases that reveal the dynamics of this topic in action' },
+];
+
+// Intent → preferred angle pool (maps curiosity type to content region)
+const INTENT_ANGLE_REGION = {
+  "I'm open to discovery":                              'around',
+  "I'm browsing for emerging trends and perspectives":  'both',
+  "I want to feel something (funny, emotional, weird)": 'around',
+  "I want to relax / escape":                           'around',
+  "I'm here to get something done":                     'under',
+  "I'm here to dig deeper and decide":                  'under',
+  "I'm aiming for full comprehension":                  'under',
+  "I'm building knowledge from scratch":                'both',
+};
+
+function anglePool(intent) {
+  const region = INTENT_ANGLE_REGION[intent] || 'both';
+  if (region === 'under')  return UNDER_ANGLES;
+  if (region === 'around') return AROUND_ANGLES;
+  return [...UNDER_ANGLES, ...AROUND_ANGLES];
+}
 
 // ─── Page context — any page with readable text ────────────────
 
@@ -154,31 +180,48 @@ function detectIntent(text) {
 
 // ─── Session state ─────────────────────────────────────────────
 
-const SK = { color: 'df-ci', ct: 'df-cti', hl: 'df-hl' };
+const SK = { discipline: 'df-di', color: 'df-ci', angle: 'df-ai', hl: 'df-hl' };
 
-function initSession() {
+function initSession(intent) {
+  // Discipline — random per tab session, drives color palette
+  let di = sessionStorage.getItem(SK.discipline);
+  if (di === null) {
+    di = Math.floor(Math.random() * DISCIPLINES.length);
+    sessionStorage.setItem(SK.discipline, di);
+  }
+  const discipline = DISCIPLINES[+di];
+
+  // Color — random within discipline's palette, consistent per session
   let ci = sessionStorage.getItem(SK.color);
   if (ci === null) {
-    ci = Math.floor(Math.random() * SESSION_COLORS.length);
+    ci = Math.floor(Math.random() * discipline.colors.length);
     sessionStorage.setItem(SK.color, ci);
   }
-  let cti = sessionStorage.getItem(SK.ct);
-  if (cti === null) {
-    cti = Math.floor(Math.random() * CONTENT_TYPES.length);
-    sessionStorage.setItem(SK.ct, cti);
+  const color = discipline.colors[+ci % discipline.colors.length];
+
+  // Angle — random start within intent's pool (Under or Around)
+  let ai = sessionStorage.getItem(SK.angle);
+  if (ai === null) {
+    const pool = anglePool(intent);
+    ai = Math.floor(Math.random() * pool.length);
+    sessionStorage.setItem(SK.angle, ai);
   }
+  const pool = anglePool(intent);
+  const angle = pool[+ai % pool.length];
+
   let hl = sessionStorage.getItem(SK.hl);
   if (!hl) {
     hl = HEADLINES[Math.floor(Math.random() * HEADLINES.length)];
     sessionStorage.setItem(SK.hl, hl);
   }
-  return { color: SESSION_COLORS[+ci], ctIndex: +cti, headline: hl };
+  return { discipline, color, angle, angleIdx: +ai, headline: hl };
 }
 
-function rotateCT(current) {
-  const next = (current + 1) % CONTENT_TYPES.length;
-  sessionStorage.setItem(SK.ct, next);
-  return next;
+function rotateAngle(intent, currentIdx) {
+  const pool = anglePool(intent);
+  const next = (currentIdx + 1) % pool.length;
+  sessionStorage.setItem(SK.angle, next);
+  return { angle: pool[next], angleIdx: next };
 }
 
 // ─── Utilities ─────────────────────────────────────────────────
@@ -730,7 +773,9 @@ async function handleRefresh() {
   btn.classList.add('spin');
   setTimeout(() => btn.classList.remove('spin'), 500);
 
-  appState.ctIndex = rotateCT(appState.ctIndex);
+  const { angle, angleIdx } = rotateAngle(appState.intent, appState.angleIdx);
+  appState.angle    = angle;
+  appState.angleIdx = angleIdx;
   const hl = pick(HEADLINES);
   sessionStorage.setItem(SK.hl, hl);
   if (shadow) shadow.getElementById('headline').textContent = hl;
@@ -752,13 +797,14 @@ function handleCardsClick(e) {
 
 async function loadSuggestions() {
   setCards(renderLoading());
-  const ct   = CONTENT_TYPES[appState.ctIndex];
   const resp = await chrome.runtime.sendMessage({
     type: 'FETCH_SUGGESTIONS',
     payload: {
-      context:         appState.context,
-      intent:          appState.intent,
-      contentTypeDesc: ct.desc
+      context:        appState.context,
+      intent:         appState.intent,
+      contentTypeDesc: appState.angle.desc,
+      disciplineKey:  appState.discipline.key,
+      disciplineDesc: appState.discipline.desc
     }
   });
   setCards(resp.ok ? renderSuggestions(resp.data) : renderError(resp.error));
@@ -766,58 +812,26 @@ async function loadSuggestions() {
 
 // ─── Context relevance gate ────────────────────────────────────
 //
-//  Only trigger when the page has a meaningful, discussable context:
-//  controversial / viral / opinion-laden topics, news, or social media.
-//  Pure how-to / product lookup / entertainment browsing = skip.
+//  Trigger is curiosity-intent-driven: the detected curiosity type IS
+//  the signal. "I'm open to discovery" is the generic fallback — it
+//  only triggers on known content-rich platforms where depth is certain.
+//  All other specific curiosity intents carry enough signal on their own.
 
 const TRIGGER_DOMAINS = [
   'nytimes.com','bbc.com','bbc.co.uk','theguardian.com','washingtonpost.com',
   'reuters.com','apnews.com','cnn.com','foxnews.com','nbcnews.com',
-  'abcnews.go.com','cbsnews.com','politico.com','theatlantic.com','bloomberg.com',
-  'slate.com','vox.com','huffpost.com','vice.com','wired.com','economist.com',
-  'ft.com','wsj.com','thetimes.co.uk','lemonde.fr','spiegel.de',
-  'reddit.com','twitter.com','x.com','threads.net',
-  'medium.com','substack.com'
+  'politico.com','theatlantic.com','bloomberg.com','slate.com','vox.com',
+  'wired.com','economist.com','ft.com','wsj.com','reddit.com',
+  'twitter.com','x.com','threads.net','medium.com','substack.com'
 ];
-
-const TRIGGER_KEYWORDS = [
-  // controversy / conflict
-  'controversial','controversy','scandal','crisis','protest','riot','ban','banned',
-  'censored','lawsuit','lawsuit','arrested','charged','accused','exposed',
-  'leaked','fired','resign','impeach','recall','outrage',
-  // viral / breaking
-  'viral','trending','breaking','exclusive','just in',
-  // debate / opinion
-  'vs','versus','better than','worse than','overrated','underrated',
-  'unpopular opinion','hot take','why everyone','nobody talks about',
-  'the problem with','should we','is it okay','do we need',
-  // politics / society flash points
-  'election','vote','policy','government','rights','inequality','racism',
-  'sexism','climate change','war','conflict','inflation','recession',
-  'misinformation','deepfake','privacy','surveillance','censorship',
-  // tech / culture flash points
-  'ai replacing','layoffs','strike','boycott','cancel culture','cancelled',
-  'open letter','letter to','response to','backlash','accused of',
-];
-
-const TRIGGER_INTENTS = new Set([
-  "I'm browsing for emerging trends and perspectives",
-  "I'm here to dig deeper and decide",
-]);
 
 function isContextTriggerable(context, intent) {
-  // Always on news / social / opinion domains
-  const host = window.location.hostname;
-  if (TRIGGER_DOMAINS.some(d => host.endsWith(d) || host === d)) return true;
-
-  // Intent already classified as debate or trend browsing
-  if (TRIGGER_INTENTS.has(intent)) return true;
-
-  // Context contains controversy / viral signals
-  const lc = context.toLowerCase();
-  if (TRIGGER_KEYWORDS.some(kw => lc.includes(kw))) return true;
-
-  return false;
+  if (!context || context.length < 12) return false;
+  if (intent === "I'm open to discovery") {
+    const host = window.location.hostname;
+    return TRIGGER_DOMAINS.some(d => host.includes(d));
+  }
+  return true; // every specific curiosity intent is enough signal
 }
 
 // ─── Boot ──────────────────────────────────────────────────────
@@ -829,12 +843,14 @@ async function boot() {
   const intent = detectIntent(pageCtx.context);
   if (!isContextTriggerable(pageCtx.context, intent)) return;
 
-  const session = initSession();
+  const session = initSession(intent);
   appState = {
-    context:  pageCtx.context,
+    context:    pageCtx.context,
     intent,
-    ctIndex:  session.ctIndex,
-    color:    session.color
+    angle:      session.angle,
+    angleIdx:   session.angleIdx,
+    discipline: session.discipline,
+    color:      session.color
   };
 
   await new Promise(r => setTimeout(r, 4000));

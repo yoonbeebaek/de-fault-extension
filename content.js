@@ -757,7 +757,13 @@ function mount(session) {
   });
 
   $('btnClose').addEventListener('click', () => {
-    host.remove(); host = null; shadow = null;
+    // Collapse to FAB rather than disappearing entirely
+    $('popup').style.display = 'none';
+    const fab = $('btnFab');
+    fab.style.display = 'flex';
+    fab.style.animation = 'none';
+    void fab.offsetWidth;
+    fab.style.animation = 'df-fab-in 260ms cubic-bezier(0.22,1,0.36,1)';
   });
 
   $('btnRefresh').addEventListener('click', handleRefresh);
@@ -872,3 +878,12 @@ if (!window.__dfLoaded) {
   window.__dfLoaded = true;
   boot();
 }
+
+// SPA navigation support — re-trigger when URL changes without a full page reload
+// (handles Medium, Reddit, YouTube, Twitter feed navigation)
+let _dfLastUrl = location.href;
+setInterval(() => {
+  if (location.href === _dfLastUrl || host) return;
+  _dfLastUrl = location.href;
+  boot();
+}, 2000);

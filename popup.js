@@ -16,6 +16,6 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
     text.textContent = 'Not active on this page type';
   } else {
     dot.className  = 'dot dot-active';
-    text.textContent = 'Active — popup will appear in 2s';
+    text.textContent = 'Active on this page';
   }
 });

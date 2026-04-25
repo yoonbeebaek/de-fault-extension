@@ -1,11 +1,12 @@
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
-// Built-in key — works out of the box. Override via chrome.storage if needed.
-const BUILT_IN_KEY = 'REDACTED_KEY_1';
+// API key is stored in chrome.storage.local — never hardcoded in source.
+// Inject once via DevTools console on the extension's service worker:
+//   chrome.storage.local.set({ apiKey: 'AIza...' })
 
 async function getApiKey() {
   const { apiKey } = await chrome.storage.local.get('apiKey');
-  return (apiKey && apiKey.trim()) ? apiKey.trim() : BUILT_IN_KEY;
+  return (apiKey && apiKey.trim()) ? apiKey.trim() : null;
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -24,6 +25,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 async function fetchSuggestions({ context, intent, contentTypeDesc, disciplineKey, disciplineDesc }) {
   const apiKey = await getApiKey();
+  if (!apiKey) throw new Error('No API key set. Open the service worker console and run:\nchrome.storage.local.set({ apiKey: "AIza..." })');
 
   const response = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
     method: 'POST',

@@ -23,13 +23,10 @@ body {
   position: relative;
 }
 
-.logo {
-  font-family: "David Libre", Georgia, serif;
-  font-weight: 400;
-  font-size: 32px;
-  line-height: 1.1;
-  color: rgb(255,255,255);
-  letter-spacing: 0.002em;
+.logo-img {
+  height: 26px;
+  width: auto;
+  display: block;
 }
 
 .tagline {

@@ -316,6 +316,7 @@ function buildStyles(color) {
     .popup {
       position: relative;
       width: 400px;
+      height: min(620px, calc(100vh - 52px));
       border-radius: 6px;
       overflow: hidden;
       background: ${color};
@@ -386,42 +387,44 @@ function buildStyles(color) {
       flex-shrink: 0;
     }
 
-    /* Refresh button */
+    /* Refresh button — PNG is the full 44×44 appearance */
     .btn-refresh {
       width: 44px;
       height: 44px;
-      border-radius: 50%;
-      background: rgba(0,0,0,0.20);
+      background: none;
       border: none;
       cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      position: relative;
       flex-shrink: 0;
-      transition: background 120ms ease, transform 500ms cubic-bezier(0.22,1,0.36,1);
+      transition: transform 500ms cubic-bezier(0.22,1,0.36,1);
       padding: 0;
     }
     .btn-refresh::after {
       content: '';
-      display: block;
-      width: 18px;
-      height: 18px;
+      position: absolute;
+      inset: 0;
       background: url("${_EXT}Redo_Default.png") no-repeat center / contain;
     }
-    .btn-refresh:hover  { background: rgba(0,0,0,0.35); }
     .btn-refresh:hover::after { background-image: url("${_EXT}Redo_Hover.png"); }
     .btn-refresh:active { transform: scale(0.94); }
     .btn-refresh.spin   { transform: rotate(360deg); }
 
-    /* ── Content slot: left:20 top:181 w:360 h:396 ── */
+    /* ── Content slot: flex:1 fills space between header and footer, scrolls ── */
     .cards {
-      padding: 0 20px 4px 20px;    /* 400 - 20 - 20 = 360px wide = spec w:360 */
+      padding: 14px 20px 14px 20px;
       display: flex;
       flex-direction: column;
       gap: 10px;
-      flex-shrink: 0;
+      flex: 1;
+      overflow-y: auto;
+      min-height: 0;
     }
-
+    .cards::-webkit-scrollbar { width: 3px; }
+    .cards::-webkit-scrollbar-track { background: transparent; }
+    .cards::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.28);
+      border-radius: 2px;
+    }
     /* ── Recommendation wells — rgba(0,0,0,0.2) at border-radius:3 ── */
     .card {
       display: flex;
@@ -786,17 +789,21 @@ function handleCardsClick(e) {
 
 async function loadSuggestions() {
   setCards(renderLoading());
-  const resp = await chrome.runtime.sendMessage({
-    type: 'FETCH_SUGGESTIONS',
-    payload: {
-      context:        appState.context,
-      intent:         appState.intent,
-      contentTypeDesc: appState.angle.desc,
-      disciplineKey:  appState.discipline.key,
-      disciplineDesc: appState.discipline.desc
-    }
-  });
-  setCards(resp.ok ? renderSuggestions(resp.data) : renderError(resp.error));
+  try {
+    const resp = await chrome.runtime.sendMessage({
+      type: 'FETCH_SUGGESTIONS',
+      payload: {
+        context:        appState.context,
+        intent:         appState.intent,
+        contentTypeDesc: appState.angle.desc,
+        disciplineKey:  appState.discipline.key,
+        disciplineDesc: appState.discipline.desc
+      }
+    });
+    setCards(resp.ok ? renderSuggestions(resp.data) : renderError(resp.error));
+  } catch (err) {
+    setCards(renderError(err?.message || 'Could not reach background — try reloading the page.'));
+  }
 }
 
 // ─── Context relevance gate ────────────────────────────────────

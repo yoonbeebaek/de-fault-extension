@@ -608,35 +608,26 @@ function buildStyles(color) {
     }
     .btn-retry:hover { background: rgba(255,255,255,0.25); }
 
-    /* ── Floating action button (collapsed state) ── */
+    /* ── Floating action button ── */
     .df-fab {
-      width: 48px;
-      height: 48px;
-      border-radius: 50%;
-      background: rgb(17,17,17);
+      width: 44px;
+      height: 44px;
+      background: none;
       border: none;
+      padding: 0;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.45), 0 1px 3px rgba(0,0,0,0.30);
-      transition: transform 140ms ease, box-shadow 140ms ease;
+      line-height: 0;
+      filter: drop-shadow(0 2px 8px rgba(0,0,0,0.40));
+      transition: transform 140ms ease, filter 140ms ease;
     }
     .df-fab:hover {
       transform: scale(1.08);
-      box-shadow: 0 4px 20px rgba(0,0,0,0.55), 0 2px 6px rgba(0,0,0,0.30);
+      filter: drop-shadow(0 4px 16px rgba(0,0,0,0.55));
     }
     .df-fab:active { transform: scale(0.95); }
-    .fab-logo {
-      font-family: "David Libre", Georgia, serif;
-      font-size: 17px;
-      font-weight: 400;
-      color: rgb(255,255,255);
-      line-height: 1;
-      letter-spacing: -0.02em;
-      user-select: none;
-      pointer-events: none;
-    }
     @keyframes df-fab-in {
       from { opacity: 0; transform: scale(0.55); }
       to   { opacity: 1; transform: scale(1); }
@@ -713,9 +704,7 @@ function mount(session) {
   shadow.innerHTML = `
     <style>${buildStyles(session.color)}</style>
 
-    <button class="df-fab" id="btnFab" title="De.fault — expand" style="display:none">
-      <span class="fab-logo">df</span>
-    </button>
+    <button class="df-fab" id="btnFab" title="De.fault — expand" style="display:none"><svg width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#df-fab-clip)"><path d="M22.0161 0H21.9839C9.84251 0 0 9.84251 0 21.9839V22.0161C0 34.1575 9.84251 44 21.9839 44H22.0161C34.1575 44 44 34.1575 44 22.0161V21.9839C44 9.84251 34.1575 0 22.0161 0Z" fill="#111111"/><path d="M28.3433 10.8789C28.3433 10.8789 28.5693 10.7821 28.5693 10.653V7.65078C28.5693 7.65078 28.4725 7.4248 28.3433 7.4248H25.5994C25.5994 7.4248 25.3411 7.4248 25.212 7.48937L21.7901 8.52238V17.5935C21.1445 17.1093 20.3052 16.7865 19.3045 16.7865C16.8188 16.7865 14.6559 18.8203 14.6559 22.0807V29.4087C14.6559 32.6368 16.8188 34.6706 19.3045 34.6706C19.9178 34.6706 20.4343 34.5415 20.9185 34.3478H25.4057V20.3375H28.3433C28.3433 20.3375 28.5693 20.2407 28.5693 20.1115V16.9802C28.5693 16.9802 28.4725 16.7542 28.3433 16.7542H25.4057V10.8789H28.3433ZM21.7901 29.5055C21.6287 30.5708 20.7894 31.1196 20.0147 31.1196C19.143 31.1196 18.2714 30.474 18.2714 29.1181V22.3067C18.2714 20.9831 19.143 20.3052 20.0147 20.3052C20.7894 20.3052 21.6287 20.854 21.7901 21.887V25.8254V29.4732V29.5055Z" fill="white"/></g><defs><clipPath id="df-fab-clip"><rect width="44" height="44" fill="white"/></clipPath></defs></svg></button>
 
     <div class="popup" id="popup">
       <div class="controls">

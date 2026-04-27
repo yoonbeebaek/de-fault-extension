@@ -252,7 +252,10 @@ function imgUrl(query, size, idx) {
   return `https://picsum.photos/seed/${hashStr((query || '') + idx)}/${size}/${size}`;
 }
 
-// ─── Icons — exact SVG paths from DfIcon / DfMediumIcon ────────
+// ─── Icon URLs — resolved once at load time ────────────────────
+const _EXT = chrome.runtime.getURL('icons/');
+
+// ─── Icons ─────────────────────────────────────────────────────
 
 // DfIcon: 15×15 circle icons for card chrome
 const ICON_CLOSE = `<svg width="15" height="15" viewBox="0 0 15 15" fill="currentColor">
@@ -263,42 +266,15 @@ const ICON_SHRINK = `<svg width="15" height="15" viewBox="0 0 15 15" fill="curre
   <path d="M7.5 0a7.5 7.5 0 110 15 7.5 7.5 0 010-15zM4.17 6.9a.6.6 0 100 1.2h6.66a.6.6 0 100-1.2z"/>
 </svg>`;
 
-// DfIcon redo — clean counterclockwise circular arrow
-const ICON_REDO = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M16 9A7 7 0 1 1 9 2"/>
-  <polyline points="9 0.5 9 4.5 13 4.5"/>
-</svg>`;
+// Save — user's Menu.png; CSS opacity drives ghost (inactive) → white (saved) state
+const ICON_SAVE = `<img src="${_EXT}Menu.png" width="14" height="14" alt="" style="display:block;">`;
 
-// DfIcon save — bookmark ribbon
-const ICON_SAVE = `<svg width="10" height="12" viewBox="0 0 7 10" fill="currentColor">
-  <path d="M7 .8a.8.8 0 00-.8-.8H.8A.8.8 0 000 .8v8.1c0 .56.58.93 1.1.7L3 8.76a.6.6 0 01.5 0l1.9.85a.77.77 0 001.1-.7Z"/>
-</svg>`;
-const ICON_SAVE_ACTIVE = ICON_SAVE; // same path, CSS drives color change (ghost → white)
-
-// DfMediumIcon — content-type glyphs in rounded-square containers
-// Categories: ARTICLE · VIDEO · AUDIO · PRODUCT
+// Content-type badges — user's uploaded PNGs
 const MEDIUM_ICONS = {
-  ARTICLE: `<svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-    <rect width="14" height="14" rx="3" fill="rgba(255,255,255,0.18)"/>
-    <rect x="3" y="3.5" width="8" height="1.5" rx="0.75" fill="white"/>
-    <rect x="3" y="6.25" width="8" height="1.5" rx="0.75" fill="white"/>
-    <rect x="3" y="9"    width="5" height="1.5" rx="0.75" fill="white"/>
-  </svg>`,
-  VIDEO: `<svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-    <rect width="14" height="14" rx="3" fill="rgba(255,255,255,0.18)"/>
-    <path d="M5.5 4L10.5 7 5.5 10V4z" fill="white"/>
-  </svg>`,
-  AUDIO: `<svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-    <rect width="14" height="14" rx="3" fill="rgba(255,255,255,0.18)"/>
-    <path d="M3.5 8.5A3.5 3.5 0 0 1 7 5a3.5 3.5 0 0 1 3.5 3.5" stroke="white" stroke-width="1.4" stroke-linecap="round"/>
-    <rect x="2.5" y="8.5" width="2" height="3" rx="1" fill="white"/>
-    <rect x="9.5" y="8.5" width="2" height="3" rx="1" fill="white"/>
-  </svg>`,
-  PRODUCT: `<svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-    <rect width="14" height="14" rx="3" fill="rgba(255,255,255,0.18)"/>
-    <path d="M2.5 2.5h5l4 4-4.5 4.5-4-4v-4.5z" stroke="white" stroke-width="1.2" stroke-linejoin="round"/>
-    <circle cx="6.5" cy="5.5" r="1" fill="white"/>
-  </svg>`
+  ARTICLE: `<img src="${_EXT}ARTICLE.png" width="14" height="14" alt="" style="display:block;">`,
+  VIDEO:   `<img src="${_EXT}VIDEO.png"   width="14" height="14" alt="" style="display:block;">`,
+  AUDIO:   `<img src="${_EXT}AUDIO.png"   width="14" height="14" alt="" style="display:block;">`,
+  PRODUCT: `<img src="${_EXT}PRODUCT.png" width="14" height="14" alt="" style="display:block;">`,
 };
 
 // ─── Styles ────────────────────────────────────────────────────
@@ -410,23 +386,30 @@ function buildStyles(color) {
       flex-shrink: 0;
     }
 
-    /* Refresh FAB — .df-fab--inactive style */
+    /* Refresh button */
     .btn-refresh {
       width: 44px;
       height: 44px;
       border-radius: 50%;
       background: rgba(0,0,0,0.20);
       border: none;
-      color: rgb(255,255,255);
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
       transition: background 120ms ease, transform 500ms cubic-bezier(0.22,1,0.36,1);
-      line-height: 0;
+      padding: 0;
+    }
+    .btn-refresh::after {
+      content: '';
+      display: block;
+      width: 18px;
+      height: 18px;
+      background: url("${_EXT}Redo_Default.png") no-repeat center / contain;
     }
     .btn-refresh:hover  { background: rgba(0,0,0,0.35); }
+    .btn-refresh:hover::after { background-image: url("${_EXT}Redo_Hover.png"); }
     .btn-refresh:active { transform: scale(0.94); }
     .btn-refresh.spin   { transform: rotate(360deg); }
 
@@ -515,17 +498,16 @@ function buildStyles(color) {
       margin-left: auto;
       background: none;
       border: none;
-      color: rgba(255,255,255,0.32);   /* --fg-ghost */
       cursor: pointer;
       padding: 0;
       display: flex;
       align-items: center;
       flex-shrink: 0;
-      transition: color 120ms ease;
-      line-height: 0;
+      opacity: 0.38;
+      transition: opacity 120ms ease;
     }
-    .btn-save:hover { color: rgba(255,255,255,0.85); }
-    .btn-save.saved { color: rgb(255,255,255); }
+    .btn-save:hover { opacity: 0.85; }
+    .btn-save.saved { opacity: 1.0; }
 
     /* ── Recommendation title ── */
     .card-title {
@@ -620,18 +602,15 @@ function buildStyles(color) {
     .df-fab {
       width: 44px;
       height: 44px;
-      background: none;
+      background: url("${_EXT}Floating_inactivated.png") no-repeat center / 44px 44px;
       border: none;
       padding: 0;
       cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      line-height: 0;
       filter: drop-shadow(0 2px 8px rgba(0,0,0,0.40));
       transition: transform 140ms ease, filter 140ms ease;
     }
     .df-fab:hover {
+      background-image: url("${_EXT}Floating_Activated.png");
       transform: scale(1.08);
       filter: drop-shadow(0 4px 16px rgba(0,0,0,0.55));
     }
@@ -712,7 +691,7 @@ function mount(session) {
   shadow.innerHTML = `
     <style>${buildStyles(session.color)}</style>
 
-    <button class="df-fab" id="btnFab" title="De.fault — expand" style="display:none"><svg width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#df-fab-clip)"><path d="M22.0161 0H21.9839C9.84251 0 0 9.84251 0 21.9839V22.0161C0 34.1575 9.84251 44 21.9839 44H22.0161C34.1575 44 44 34.1575 44 22.0161V21.9839C44 9.84251 34.1575 0 22.0161 0Z" fill="#111111"/><path d="M28.3433 10.8789C28.3433 10.8789 28.5693 10.7821 28.5693 10.653V7.65078C28.5693 7.65078 28.4725 7.4248 28.3433 7.4248H25.5994C25.5994 7.4248 25.3411 7.4248 25.212 7.48937L21.7901 8.52238V17.5935C21.1445 17.1093 20.3052 16.7865 19.3045 16.7865C16.8188 16.7865 14.6559 18.8203 14.6559 22.0807V29.4087C14.6559 32.6368 16.8188 34.6706 19.3045 34.6706C19.9178 34.6706 20.4343 34.5415 20.9185 34.3478H25.4057V20.3375H28.3433C28.3433 20.3375 28.5693 20.2407 28.5693 20.1115V16.9802C28.5693 16.9802 28.4725 16.7542 28.3433 16.7542H25.4057V10.8789H28.3433ZM21.7901 29.5055C21.6287 30.5708 20.7894 31.1196 20.0147 31.1196C19.143 31.1196 18.2714 30.474 18.2714 29.1181V22.3067C18.2714 20.9831 19.143 20.3052 20.0147 20.3052C20.7894 20.3052 21.6287 20.854 21.7901 21.887V25.8254V29.4732V29.5055Z" fill="white"/></g><defs><clipPath id="df-fab-clip"><rect width="44" height="44" fill="white"/></clipPath></defs></svg></button>
+    <button class="df-fab" id="btnFab" title="De.fault — expand" style="display:none"></button>
 
     <div class="popup" id="popup">
       <div class="controls">
@@ -721,7 +700,7 @@ function mount(session) {
       </div>
       <div class="header">
         <h1 class="headline" id="headline">${esc(session.headline)}</h1>
-        <button class="btn-refresh" id="btnRefresh" title="New angle">${ICON_REDO}</button>
+        <button class="btn-refresh" id="btnRefresh" title="New angle"></button>
       </div>
       <div class="cards" id="cards">${renderLoading()}</div>
       <div class="footer">
@@ -799,8 +778,7 @@ function handleCardsClick(e) {
 
   const saveBtn = e.target.closest('.btn-save');
   if (saveBtn) {
-    const saved = saveBtn.classList.toggle('saved');
-    saveBtn.innerHTML = saved ? ICON_SAVE_ACTIVE : ICON_SAVE;
+    saveBtn.classList.toggle('saved');
   }
 }
 

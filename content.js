@@ -263,33 +263,41 @@ const ICON_SHRINK = `<svg width="15" height="15" viewBox="0 0 15 15" fill="curre
   <path d="M7.5 0a7.5 7.5 0 110 15 7.5 7.5 0 010-15zM4.17 6.9a.6.6 0 100 1.2h6.66a.6.6 0 100-1.2z"/>
 </svg>`;
 
-// DfIcon redo — Material refresh icon path
-const ICON_REDO = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-  <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4a8 8 0 0 0-8 8 8 8 0 0 0 8 8c3.73 0 6.84-2.55 7.73-6h-2.08A6 6 0 0 1 12 18a6 6 0 0 1-6-6 6 6 0 0 1 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+// DfIcon redo — clean counterclockwise circular arrow
+const ICON_REDO = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M16 9A7 7 0 1 1 9 2"/>
+  <polyline points="9 0.5 9 4.5 13 4.5"/>
 </svg>`;
 
-// DfIcon save — bookmark ribbon, 10×10 for eyebrow
+// DfIcon save — bookmark ribbon
 const ICON_SAVE = `<svg width="10" height="12" viewBox="0 0 7 10" fill="currentColor">
   <path d="M7 .8a.8.8 0 00-.8-.8H.8A.8.8 0 000 .8v8.1c0 .56.58.93 1.1.7L3 8.76a.6.6 0 01.5 0l1.9.85a.77.77 0 001.1-.7Z"/>
 </svg>`;
-const ICON_SAVE_ACTIVE = ICON_SAVE; // same path, CSS drives color change
+const ICON_SAVE_ACTIVE = ICON_SAVE; // same path, CSS drives color change (ghost → white)
 
-// DfMediumIcon — 12×12 content-type glyphs
+// DfMediumIcon — content-type glyphs in rounded-square containers
+// Categories: ARTICLE · VIDEO · AUDIO · PRODUCT
 const MEDIUM_ICONS = {
-  ARTICLE: `<svg width="12" height="12" viewBox="0 0 12 12" fill="rgba(255,255,255,0.70)">
-    <path d="M10 0C11.1 0 12 .9 12 2v8c0 1.1-.9 2-2 2H2C.9 12 0 11.1 0 10V2C0 .9.9 0 2 0h8zM3.5 7.5v1h5v-1h-5zm0-2v1h5v-1h-5zm0-2v1h5v-1h-5z"/>
+  ARTICLE: `<svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+    <rect width="14" height="14" rx="3" fill="rgba(255,255,255,0.18)"/>
+    <rect x="3" y="3.5" width="8" height="1.5" rx="0.75" fill="white"/>
+    <rect x="3" y="6.25" width="8" height="1.5" rx="0.75" fill="white"/>
+    <rect x="3" y="9"    width="5" height="1.5" rx="0.75" fill="white"/>
   </svg>`,
-  VIDEO: `<svg width="12" height="12" viewBox="0 0 12 12" fill="rgba(255,255,255,0.70)">
-    <rect width="12" height="12" rx="2"/>
-    <path d="M5 3.5L9 6 5 8.5V3.5z" fill="rgba(0,0,0,0.7)"/>
+  VIDEO: `<svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+    <rect width="14" height="14" rx="3" fill="rgba(255,255,255,0.18)"/>
+    <path d="M5.5 4L10.5 7 5.5 10V4z" fill="white"/>
   </svg>`,
-  AUDIO: `<svg width="12" height="12" viewBox="0 0 12 12" fill="rgba(255,255,255,0.70)">
-    <circle cx="4" cy="8" r="1.8"/>
-    <circle cx="9" cy="7" r="1.4"/>
-    <path d="M5.8 8V3L10.4 2V7" stroke="rgba(255,255,255,0.70)" stroke-width="1" fill="none"/>
+  AUDIO: `<svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+    <rect width="14" height="14" rx="3" fill="rgba(255,255,255,0.18)"/>
+    <path d="M3.5 8.5A3.5 3.5 0 0 1 7 5a3.5 3.5 0 0 1 3.5 3.5" stroke="white" stroke-width="1.4" stroke-linecap="round"/>
+    <rect x="2.5" y="8.5" width="2" height="3" rx="1" fill="white"/>
+    <rect x="9.5" y="8.5" width="2" height="3" rx="1" fill="white"/>
   </svg>`,
-  PRODUCT: `<svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-    <path d="M2 4L6 2l4 2v5l-4 2-4-2V4z" stroke="rgba(255,255,255,0.70)" stroke-width="1"/>
+  PRODUCT: `<svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+    <rect width="14" height="14" rx="3" fill="rgba(255,255,255,0.18)"/>
+    <path d="M2.5 2.5h5l4 4-4.5 4.5-4-4v-4.5z" stroke="white" stroke-width="1.2" stroke-linejoin="round"/>
+    <circle cx="6.5" cy="5.5" r="1" fill="white"/>
   </svg>`
 };
 

@@ -372,6 +372,17 @@ function buildStyles(color) {
       position: relative;
     }
 
+    /* ── Headline: David Libre, 36/40 ── */
+    .headline {
+      font-family: "David Libre", serif;
+      font-weight: 400;
+      font-size: 36px;
+      line-height: 40px;
+      color: rgb(255,255,255);
+      flex: 1;
+      min-width: 0;
+    }
+
     /* THE BAR — explicit element between header and scroll area */
     .df-bar {
       height: 1px;

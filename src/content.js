@@ -573,10 +573,17 @@ function buildStyles(color) {
     }
     .error-icon { font-size: 28px; opacity: 0.6; }
     .error-msg {
-      font-size: 12px;
-      color: rgba(255,255,255,0.85);
+      font-size: 13px;
+      color: rgba(255,255,255,0.90);
       line-height: 1.5;
       max-width: 290px;
+    }
+    .error-hint {
+      font-size: 11px;
+      color: rgba(255,255,255,0.55);
+      line-height: 1.5;
+      max-width: 270px;
+      text-align: center;
     }
     .btn-retry {
       font-family: inherit;
@@ -627,11 +634,16 @@ function renderLoading() {
 }
 
 function renderError(message) {
+  const isKeyError = /key|auth|401|403/i.test(message);
+  const hint = isKeyError
+    ? 'config.js 에 실제 Gemini API 키를 붙여넣고 익스텐션을 리로드해 주세요.'
+    : '페이지를 새로고침하거나 익스텐션을 리로드해 주세요.';
   return `
     <div class="error-wrap">
       <div class="error-icon">⚡</div>
       <p class="error-msg">${esc(message)}</p>
-      <button class="btn-retry">Try again</button>
+      <p class="error-hint">${hint}</p>
+      <button class="btn-retry">다시 시도</button>
     </div>
   `;
 }
@@ -843,7 +855,7 @@ async function boot() {
     color:      session.color
   };
 
-  await new Promise(r => setTimeout(r, 4000));
+  await new Promise(r => setTimeout(r, 1500));
   if (!getPageContext()) return;
 
   mount(session);

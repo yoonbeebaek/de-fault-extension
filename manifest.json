@@ -22,15 +22,15 @@
     "default_popup": "popup/popup.html",
     "default_title": "De.fault",
     "default_icon": {
-      "16": "icons/icon16.png",
-      "48": "icons/icon48.png",
-      "128": "icons/icon128.png"
+      "16": "icons/Floating_Activated.png",
+      "48": "icons/Floating_Activated.png",
+      "128": "icons/Floating_Activated.png"
     }
   },
   "icons": {
-    "16": "icons/icon16.png",
-    "48": "icons/icon48.png",
-    "128": "icons/icon128.png"
+    "16": "icons/Floating_Activated.png",
+    "48": "icons/Floating_Activated.png",
+    "128": "icons/Floating_Activated.png"
   },
   "web_accessible_resources": [
     {

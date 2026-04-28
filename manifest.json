@@ -9,17 +9,17 @@
     "https://picsum.photos/*"
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "src/background.js"
   },
   "content_scripts": [
     {
       "matches": ["https://*/*", "http://*/*"],
-      "js": ["content.js"],
+      "js": ["src/content.js"],
       "run_at": "document_idle"
     }
   ],
   "action": {
-    "default_popup": "popup.html",
+    "default_popup": "popup/popup.html",
     "default_title": "De.fault",
     "default_icon": {
       "16": "icons/icon16.png",
@@ -37,7 +37,6 @@
       "resources": [
         "fonts/*.ttf",
         "fonts/*.woff2",
-        "tokens.css",
         "icons/*.png"
       ],
       "matches": ["<all_urls>"]

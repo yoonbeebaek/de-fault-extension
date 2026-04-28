@@ -312,11 +312,11 @@ function buildStyles(color) {
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    /* ── Card shell: 400×620, radius 6 ── */
+    /* ── Card shell: 400×510 viewport ── */
     .popup {
       position: relative;
       width: 400px;
-      height: min(620px, calc(100vh - 52px));
+      height: min(510px, calc(100vh - 52px));
       border-radius: 6px;
       overflow: hidden;
       background: ${color};
@@ -362,18 +362,26 @@ function buildStyles(color) {
     }
     .btn-ctrl:hover { color: rgb(255,255,255); }
 
-    /* ── Header: title slot — left:25 top:47 w:298 h:104 ──
-       padding-top:47  puts title at correct y
-       padding-bottom:30  fills gap so header = 181px (--card-content-top) */
+    /* ── Header: fixed, not scrollable ── */
     .header {
-      padding: 47px 25px 30px 25px;
+      padding: 47px 25px 24px 25px;
       display: flex;
       align-items: flex-start;
       gap: 8px;
       flex-shrink: 0;
+      position: relative;
     }
 
-    /* 47 + 104 + 30 = 181px = --card-content-top ✓ */
+    /* THE BAR — clips scroll content; sits at the header/scroll boundary */
+    .header::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 20px; right: 20px;
+      height: 1px;
+      background: rgba(255,255,255,0.20);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.35);
+    }
+
     .headline {
       font-family: "David Libre", Georgia, serif;
       font-weight: 400;
@@ -409,21 +417,25 @@ function buildStyles(color) {
     .btn-refresh:active { transform: scale(0.94); }
     .btn-refresh.spin   { transform: rotate(360deg); }
 
-    /* ── Content slot: flex:1 fills space between header and footer, scrolls ── */
-    .cards {
-      padding: 14px 20px 14px 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
+    /* ── Scroll container — fills remaining height, clips at the bar ── */
+    .df-scroll {
       flex: 1;
       overflow-y: auto;
       min-height: 0;
+      padding: 14px 20px 24px;
     }
-    .cards::-webkit-scrollbar { width: 3px; }
-    .cards::-webkit-scrollbar-track { background: transparent; }
-    .cards::-webkit-scrollbar-thumb {
+    .df-scroll::-webkit-scrollbar { width: 3px; }
+    .df-scroll::-webkit-scrollbar-track { background: transparent; }
+    .df-scroll::-webkit-scrollbar-thumb {
       background: rgba(255,255,255,0.28);
       border-radius: 2px;
+    }
+
+    /* ── Cards column inside scroll ── */
+    .cards {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
     }
     /* ── Recommendation wells — rgba(0,0,0,0.2) at border-radius:3 ── */
     .card {
@@ -529,24 +541,12 @@ function buildStyles(color) {
       -webkit-line-clamp: 2;
     }
 
-    /* ── Footer: 1px rule + shadow, 43px, left:20 ──
-       spec: "Send Feedback · 2026 de.fault all rights reserved" */
+    /* ── Footer — inside the scroll area, sits below cards ── */
     .footer {
-      position: relative;
-      height: 43px;
-      flex-shrink: 0;
-      padding: 0 20px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-    }
-    .footer::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 20px; right: 20px;
-      height: 1px;
-      background: rgba(255,255,255,0.20);
-      box-shadow: 0px 1px 2px 0px rgba(0,0,0,0.35);   /* --shadow-rule */
+      margin-top: 24px;
     }
     .feedback-link {
       font-size: 12px;
@@ -705,12 +705,14 @@ function mount(session) {
         <h1 class="headline" id="headline">${esc(session.headline)}</h1>
         <button class="btn-refresh" id="btnRefresh" title="New angle"></button>
       </div>
-      <div class="cards" id="cards">${renderLoading()}</div>
-      <div class="footer">
-        <a class="feedback-link"
-           href="https://github.com/yoonbeebaek/de-fault-extension/issues"
-           target="_blank" rel="noopener noreferrer">Send Feedback</a>
-        <span class="copyright">2026 de.fault all rights reserved</span>
+      <div class="df-scroll">
+        <div class="cards" id="cards">${renderLoading()}</div>
+        <div class="footer">
+          <a class="feedback-link"
+             href="https://github.com/yoonbeebaek/de-fault-extension/issues"
+             target="_blank" rel="noopener noreferrer">Send Feedback</a>
+          <span class="copyright">2026 de.fault all rights reserved</span>
+        </div>
       </div>
     </div>
   `;

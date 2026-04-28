@@ -372,27 +372,13 @@ function buildStyles(color) {
       position: relative;
     }
 
-    /* THE BAR — clips scroll content; sits at the header/scroll boundary */
-    .header::after {
-      content: '';
-      position: absolute;
-      bottom: 0; left: 20px; right: 20px;
+    /* THE BAR — explicit element between header and scroll area */
+    .df-bar {
       height: 1px;
-      background: rgba(255,255,255,0.20);
-      box-shadow: 0 1px 2px rgba(0,0,0,0.35);
-    }
-
-    .headline {
-      font-family: "David Libre", Georgia, serif;
-      font-weight: 400;
-      font-size: 36px;
-      line-height: 40px;           /* spec: 36/40 */
-      color: rgb(255,255,255);
-      letter-spacing: 0.002em;
-      width: 298px;                /* spec: w:298 */
-      max-height: 120px;           /* 3 lines × 40px line-height */
-      overflow: hidden;
       flex-shrink: 0;
+      margin: 0 20px;
+      background: rgba(255,255,255,0.22);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.40);
     }
 
     /* Refresh button — PNG is the full 44×44 appearance */
@@ -404,7 +390,6 @@ function buildStyles(color) {
       cursor: pointer;
       position: relative;
       flex-shrink: 0;
-      transition: transform 500ms cubic-bezier(0.22,1,0.36,1);
       padding: 0;
     }
     .btn-refresh::after {
@@ -415,7 +400,13 @@ function buildStyles(color) {
     }
     .btn-refresh:hover::after { background-image: url("${_EXT}Redo_Hover.png"); }
     .btn-refresh:active { transform: scale(0.94); }
-    .btn-refresh.spin   { transform: rotate(360deg); }
+    @keyframes df-spin {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+    .btn-refresh.spin {
+      animation: df-spin 580ms cubic-bezier(0.34, 1.2, 0.64, 1);
+    }
 
     /* ── Scroll container — fills remaining height, clips at the bar ── */
     .df-scroll {
@@ -705,6 +696,7 @@ function mount(session) {
         <h1 class="headline" id="headline">${esc(session.headline)}</h1>
         <button class="btn-refresh" id="btnRefresh" title="New angle"></button>
       </div>
+      <div class="df-bar"></div>
       <div class="df-scroll">
         <div class="cards" id="cards">${renderLoading()}</div>
         <div class="footer">
@@ -766,7 +758,7 @@ async function handleRefresh() {
   btn.classList.remove('spin');
   void btn.offsetWidth;            // reflow to restart animation
   btn.classList.add('spin');
-  setTimeout(() => btn.classList.remove('spin'), 500);
+  setTimeout(() => btn.classList.remove('spin'), 600);
 
   const { angle, angleIdx } = rotateAngle(appState.intent, appState.angleIdx);
   appState.angle    = angle;

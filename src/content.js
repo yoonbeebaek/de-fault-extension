@@ -25,17 +25,20 @@ const DISCIPLINES = [
   {
     key: 'linguistic',
     desc: 'how this topic is named, framed, and contested through language, narrative, and media logic — what rhetoric or discourse shapes the way people understand it',
-    colors: ['rgb(0,70,189)','rgb(9,50,122)','rgb(1,55,147)','rgb(60,72,103)','rgb(0,67,116)']
+    // Blue family — #001FE9 is the anchor
+    colors: ['rgb(0,31,233)','rgb(9,50,122)','rgb(0,55,180)','rgb(20,40,160)','rgb(0,80,210)']
   },
   {
     key: 'economic',
     desc: 'what systems, institutions, and power structures produce or maintain this topic — who holds power, who benefits, what capital or policy forces are at play',
-    colors: ['rgb(142,30,30)','rgb(118,57,64)','rgb(159,2,143)','rgb(164,72,20)','rgb(87,61,36)']
+    // Red / pink family — #F90000 is the anchor
+    colors: ['rgb(249,0,0)','rgb(180,0,0)','rgb(210,30,60)','rgb(160,0,80)','rgb(220,50,90)']
   },
   {
     key: 'biological',
     desc: 'how this topic intersects with bodies, health, ecology, or physical systems — what natural, scientific, or evolutionary forces operate beneath the surface',
-    colors: ['rgb(0,118,50)','rgb(5,90,18)','rgb(35,80,61)','rgb(45,78,6)','rgb(1,90,95)','rgb(67,126,140)']
+    // Green family — #004500 is the anchor
+    colors: ['rgb(0,69,0)','rgb(0,100,40)','rgb(20,80,50)','rgb(0,90,60)','rgb(30,110,70)']
   }
 ];
 
@@ -468,10 +471,10 @@ function buildStyles(color) {
       padding: 12px 16px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 0;
       min-width: 0;
     }
-    .card-secondary .card-body { padding: 10px 14px; gap: 6px; }
+    .card-secondary .card-body { padding: 10px 14px; }
 
     /* ── Eyebrow: [icon] TYPE [1px rule] SOURCE [save] ── */
     .eyebrow {
@@ -526,12 +529,15 @@ function buildStyles(color) {
     .btn-save:hover { opacity: 0.85; }
     .btn-save.saved { opacity: 1.0; }
 
-    /* ── Recommendation title ── */
+    /* ── Recommendation title — centered vertically in remaining space ── */
     .card-title {
       font-weight: 400;
-      font-size: 16px;            /* --fz-title */
-      line-height: 1.30;          /* --lh-title */
+      font-size: 16px;
+      line-height: 1.30;
       color: rgb(255,255,255);
+      text-align: center;
+      margin: auto 0 0;          /* push to vertical center after eyebrow */
+      padding-top: 8px;
       display: -webkit-box;
       -webkit-line-clamp: 3;
       -webkit-box-orient: vertical;
@@ -541,6 +547,7 @@ function buildStyles(color) {
       font-size: 13px;
       line-height: 1.3;
       -webkit-line-clamp: 2;
+      padding-top: 6px;
     }
 
     /* ── Footer — inside the scroll area, sits below cards ── */
@@ -866,11 +873,25 @@ async function boot() {
     color:      session.color
   };
 
+  // Fire AI request immediately — runs in parallel with the 600ms page-settle wait.
+  // By the time the popup mounts, the model has already had a head start.
+  const earlyFetch = chrome.runtime.sendMessage({
+    type: 'FETCH_SUGGESTIONS',
+    payload: {
+      context:         appState.context,
+      intent:          appState.intent,
+      contentTypeDesc: appState.angle.desc,
+      disciplineKey:   appState.discipline.key,
+      disciplineDesc:  appState.discipline.desc
+    }
+  }).catch(err => ({ ok: false, error: err?.message || 'Request failed' }));
+
   await new Promise(r => setTimeout(r, 600));
   if (!getPageContext()) return;
 
   mount(session);
-  await loadSuggestions();
+  const resp = await earlyFetch;
+  setCards(resp.ok ? renderSuggestions(resp.data) : renderError(resp.error));
 }
 
 if (!window.__dfLoaded) {

@@ -96,14 +96,11 @@ async function runAI({ context, intent, contentTypeDesc, disciplineKey, discipli
   try {
     text = await session.prompt(
       `Lens: ${disciplineKey} — ${disciplineDesc}\n` +
-      `Topic: "${context}"\n` +
-      `Intent: "${intent}"\n` +
-      `Angle: ${contentTypeDesc}\n\n` +
-      `Give 3 real, surprising content suggestions (articles/videos/podcasts).\n` +
-      `Output only a JSON array, nothing else:\n` +
-      `[{"title":"...","source":"...","type":"ARTICLE","description":"...","imageQuery":"..."},` +
-      `{"title":"...","source":"...","type":"VIDEO","description":"...","imageQuery":"..."},` +
-      `{"title":"...","source":"...","type":"AUDIO","description":"...","imageQuery":"..."}]`
+      `Topic: "${context}". Intent: "${intent}". Angle: ${contentTypeDesc}\n\n` +
+      `3 real surprising suggestions (articles/videos/podcasts). JSON only:\n` +
+      `[{"title":"...","source":"...","type":"ARTICLE"},` +
+      `{"title":"...","source":"...","type":"VIDEO"},` +
+      `{"title":"...","source":"...","type":"AUDIO"}]`
     );
   } catch (e) {
     _sess = null;

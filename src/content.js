@@ -809,20 +809,34 @@ function handleCardsClick(e) {
 
 // ─── Data ──────────────────────────────────────────────────────
 
+function cacheKey() {
+  return `df:${appState.context}:${appState.discipline.key}:${appState.angle.key}`;
+}
+
+function fetchPayload() {
+  return {
+    context:         appState.context,
+    intent:          appState.intent,
+    contentTypeDesc: appState.angle.desc,
+    disciplineKey:   appState.discipline.key,
+    disciplineDesc:  appState.discipline.desc
+  };
+}
+
 async function loadSuggestions() {
+  const key = cacheKey();
+  const hit = sessionStorage.getItem(key);
+  if (hit) { setCards(renderSuggestions(JSON.parse(hit))); return; }
+
   setCards(renderLoading());
   try {
-    const resp = await chrome.runtime.sendMessage({
-      type: 'FETCH_SUGGESTIONS',
-      payload: {
-        context:        appState.context,
-        intent:         appState.intent,
-        contentTypeDesc: appState.angle.desc,
-        disciplineKey:  appState.discipline.key,
-        disciplineDesc: appState.discipline.desc
-      }
-    });
-    setCards(resp.ok ? renderSuggestions(resp.data) : renderError(resp.error));
+    const resp = await chrome.runtime.sendMessage({ type: 'FETCH_SUGGESTIONS', payload: fetchPayload() });
+    if (resp.ok) {
+      sessionStorage.setItem(key, JSON.stringify(resp.data));
+      setCards(renderSuggestions(resp.data));
+    } else {
+      setCards(renderError(resp.error));
+    }
   } catch (err) {
     setCards(renderError(err?.message || 'Could not reach background — try reloading the page.'));
   }
@@ -871,25 +885,31 @@ async function boot() {
     color:      session.color
   };
 
-  // Fire AI request immediately — runs in parallel with the 600ms page-settle wait.
-  // By the time the popup mounts, the model has already had a head start.
-  const earlyFetch = chrome.runtime.sendMessage({
-    type: 'FETCH_SUGGESTIONS',
-    payload: {
-      context:         appState.context,
-      intent:          appState.intent,
-      contentTypeDesc: appState.angle.desc,
-      disciplineKey:   appState.discipline.key,
-      disciplineDesc:  appState.discipline.desc
-    }
-  }).catch(err => ({ ok: false, error: err?.message || 'Request failed' }));
+  const key = cacheKey();
+  const hit = sessionStorage.getItem(key);
+
+  // Fire AI request in parallel with 600ms settle wait (unless cached)
+  const earlyFetch = hit
+    ? null
+    : chrome.runtime.sendMessage({ type: 'FETCH_SUGGESTIONS', payload: fetchPayload() })
+        .catch(err => ({ ok: false, error: err?.message || 'Request failed' }));
 
   await new Promise(r => setTimeout(r, 600));
   if (!getPageContext()) return;
 
   mount(session);
-  const resp = await earlyFetch;
-  setCards(resp.ok ? renderSuggestions(resp.data) : renderError(resp.error));
+
+  if (hit) {
+    setCards(renderSuggestions(JSON.parse(hit)));
+  } else {
+    const resp = await earlyFetch;
+    if (resp.ok) {
+      sessionStorage.setItem(key, JSON.stringify(resp.data));
+      setCards(renderSuggestions(resp.data));
+    } else {
+      setCards(renderError(resp.error));
+    }
+  }
 }
 
 if (!window.__dfLoaded) {

@@ -99,29 +99,72 @@ async function runAI({ context, intent, contentTypeDesc, disciplineKey, discipli
       `Topic: "${context}"\n` +
       `Intent: "${intent}"\n` +
       `Angle: ${contentTypeDesc}\n\n` +
-      `3 real, surprising content suggestions (articles/videos/podcasts the user would NEVER see in their feed).\n` +
+      `Give 3 real, surprising content suggestions (articles/videos/podcasts).\n` +
+      `Output only a JSON array, nothing else:\n` +
       `[{"title":"...","source":"...","type":"ARTICLE","description":"...","imageQuery":"..."},` +
       `{"title":"...","source":"...","type":"VIDEO","description":"...","imageQuery":"..."},` +
       `{"title":"...","source":"...","type":"AUDIO","description":"...","imageQuery":"..."}]`
     );
   } catch (e) {
-    // Session may have expired — destroy and let next call recreate
     _sess = null;
     return { ok: false, error: 'AI prompt failed: ' + e.message };
   }
 
-  const match = text.match(/\[[\s\S]*?\]/);
-  if (!match) return { ok: false, error: 'Response was not valid JSON. Got: ' + text.slice(0, 100) };
-
-  let suggestions;
-  try {
-    suggestions = JSON.parse(match[0]);
-  } catch (e) {
-    return { ok: false, error: 'JSON parse failed: ' + e.message };
-  }
-
-  if (!Array.isArray(suggestions) || !suggestions.length)
-    return { ok: false, error: 'AI returned an empty suggestions array.' };
-
+  const suggestions = extractSuggestions(text);
+  if (!suggestions) return { ok: false, error: 'Could not extract suggestions from AI response.' };
   return { ok: true, data: suggestions.slice(0, 3) };
 }
+
+// ─── Robust JSON extraction ────────────────────────────────────
+// Gemini Nano can: truncate mid-array, include unescaped chars,
+// leave trailing commas, or wrap in markdown. Handle all cases.
+function extractSuggestions(raw) {
+  const start = raw.indexOf('[');
+  if (start === -1) return null;
+
+  // Walk bracket depth to find the true closing ] (handles nested objects)
+  let depth = 0, end = -1;
+  for (let i = start; i < raw.length; i++) {
+    const c = raw[i];
+    if (c === '[' || c === '{') depth++;
+    else if (c === ']' || c === '}') {
+      depth--;
+      if (depth === 0) { end = i; break; }
+    }
+  }
+
+  // If output was truncated, attempt to close the last open object + array
+  let jsonStr = end !== -1
+    ? raw.slice(start, end + 1)
+    : raw.slice(start).trimEnd() + '"}]}'; // close dangling object + array
+
+  // Clean up common Gemini Nano quirks
+  jsonStr = jsonStr
+    .replace(/,\s*([}\]])/g, '$1')   // trailing commas
+    .replace(/\t/g, ' ')              // literal tabs inside strings
+    .replace(/\n(?=[^"]*"[^"]*(?:"[^"]*"[^"]*)*$)/g, ' '); // newlines inside strings
+
+  try {
+    const parsed = JSON.parse(jsonStr);
+    if (Array.isArray(parsed) && parsed.length) return parsed;
+  } catch (_) {
+    // fall through to object-by-object fallback
+  }
+
+  // Last resort: pull out any complete {"title":...} objects individually
+  const items = [];
+  let depth2 = 0, objStart = -1;
+  for (let i = start; i < raw.length; i++) {
+    if (raw[i] === '{') { if (depth2 === 0) objStart = i; depth2++; }
+    else if (raw[i] === '}') {
+      depth2--;
+      if (depth2 === 0 && objStart !== -1) {
+        try {
+          const obj = JSON.parse(raw.slice(objStart, i + 1));
+          if (obj.title) items.push(obj);
+        } catch (_) {}
+        objStart = -1;
+      }
+    }
+  }
+  return items.length ? items : null;

@@ -647,8 +647,8 @@ function renderLoading() {
 function renderError(message) {
   const isKeyError = /key|auth|401|403/i.test(message);
   const hint = isKeyError
-    ? 'config.js 에 실제 Gemini API 키를 붙여넣고 익스텐션을 리로드해 주세요.'
-    : '페이지를 새로고침하거나 익스텐션을 리로드해 주세요.';
+    ? 'Paste your Anthropic API key into config.js and reload the extension.'
+    : 'Try refreshing the page or reloading the extension.';
   return `
     <div class="error-wrap">
       <div class="error-icon">⚡</div>

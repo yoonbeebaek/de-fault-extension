@@ -17,36 +17,63 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         args: [message.payload]
       })
       .then(results => {
-        const r = results[0]?.result;
+        if (!results || !results[0]) {
+          sendResponse({ ok: false, error: 'Script injection failed — check extension permissions.' });
+          return;
+        }
+        const r = results[0].result;
         if (r?.ok) sendResponse({ ok: true, data: r.data });
         else sendResponse({ ok: false, error: r?.error || 'AI call failed.' });
       })
-      .catch(err => sendResponse({ ok: false, error: err.message }));
-    return true; // keep channel open for async response
+      .catch(err => sendResponse({ ok: false, error: 'executeScript error: ' + err.message }));
+    return true;
   }
 });
 
 // ─── Injected into the tab's MAIN world ────────────────────────
 // Must be fully self-contained — no closures from service worker scope.
+// Probes all known Chrome AI namespace variants (API changed across Chrome versions).
 async function mainWorldAI({ context, intent, contentTypeDesc, disciplineKey, disciplineDesc }) {
-  const ai = window.ai?.languageModel;
-  if (!ai) {
+  // Chrome AI namespace evolved across versions — probe all variants:
+  //   Chrome 127-130: window.ai.languageModel
+  //   Chrome 131+:    global LanguageModel  (no window.ai prefix)
+  const langModel =
+    (typeof LanguageModel !== 'undefined' && typeof LanguageModel.create === 'function'
+      ? LanguageModel : null) ||
+    window.ai?.languageModel ||
+    (typeof window.ai?.create === 'function' ? window.ai : null);
+
+  if (!langModel) {
+    // Diagnostic: show what IS available so we can understand the Chrome state
+    const hasWindowAI = typeof window.ai !== 'undefined';
+    const aiKeys = hasWindowAI ? Object.keys(window.ai) : [];
+    const hasLM = typeof LanguageModel !== 'undefined';
     return {
       ok: false,
       error:
-        'Chrome AI not available. ' +
-        'Go to chrome://flags → enable "Prompt API for Gemini Nano" → restart Chrome.'
+        `Chrome AI not found. ` +
+        `[window.ai=${hasWindowAI}, keys=(${aiKeys.join('|') || 'none'}), LanguageModel=${hasLM}] ` +
+        `— enable "Prompt API for Gemini Nano" in chrome://flags and restart Chrome.`
     };
   }
 
   try {
-    const caps = await ai.capabilities();
-    if (caps.available === 'no')
-      return { ok: false, error: 'Chrome AI is not supported on this device.' };
-    if (caps.available === 'after-download')
-      return { ok: false, error: 'Chrome AI model is still downloading — wait a moment and retry.' };
+    // availability() = Chrome 131+, capabilities() = Chrome 127-130
+    if (typeof langModel.availability === 'function') {
+      const avail = await langModel.availability();
+      if (avail === 'unavailable')
+        return { ok: false, error: 'Chrome AI not supported on this device.' };
+      if (avail === 'downloading')
+        return { ok: false, error: 'Chrome AI model is still downloading — try again in a moment.' };
+    } else if (typeof langModel.capabilities === 'function') {
+      const caps = await langModel.capabilities();
+      if (caps.available === 'no')
+        return { ok: false, error: 'Chrome AI not supported on this device.' };
+      if (caps.available === 'after-download')
+        return { ok: false, error: 'Chrome AI model is still downloading — try again in a moment.' };
+    }
 
-    const session = await ai.create({
+    const session = await langModel.create({
       temperature: 0.9,
       topK: 40,
       systemPrompt:
@@ -62,7 +89,7 @@ async function mainWorldAI({ context, intent, contentTypeDesc, disciplineKey, di
         `The user is browsing: "${context}"\n` +
         `Curiosity intent: "${intent}"\n` +
         `Content angle: ${contentTypeDesc}\n\n` +
-        `Generate exactly 3 content suggestions that illuminate "${context}" from unexpected but meaningful angles. ` +
+        'Generate exactly 3 content suggestions that illuminate this topic from unexpected but meaningful angles. ' +
         'Suggest real articles, videos, or podcasts — things a person would NEVER find in their personalized feed.\n\n' +
         'Return ONLY this JSON array (no markdown, no extra text):\n' +
         '[{"title":"exact title","source":"publisher name","type":"ARTICLE","description":"one sentence why this expands perspective","imageQuery":"3-4 word visual theme"},' +

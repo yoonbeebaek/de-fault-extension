@@ -645,9 +645,9 @@ function renderLoading() {
 }
 
 function renderError(message) {
-  const isKeyError = /key|auth|401|403/i.test(message);
-  const hint = isKeyError
-    ? 'Paste your Anthropic API key into config.js and reload the extension.'
+  const isChromeAI = /chrome ai|flags|prompt api|gemini nano/i.test(message);
+  const hint = isChromeAI
+    ? 'Go to chrome://flags → enable "Prompt API for Gemini Nano" → restart Chrome, then reload the extension.'
     : 'Try refreshing the page or reloading the extension.';
   return `
     <div class="error-wrap">

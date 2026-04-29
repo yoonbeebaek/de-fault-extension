@@ -5,7 +5,6 @@
   "description": "A de-personalization engine that expands your perspective beyond the algorithmic bubble.",
   "permissions": ["storage", "activeTab", "tabs"],
   "host_permissions": [
-    "https://api.anthropic.com/*",
     "https://picsum.photos/*"
   ],
   "background": {

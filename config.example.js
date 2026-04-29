@@ -1,4 +1,8 @@
-// Copy this file to config.js and fill in your key.
-// config.js is gitignored — the key never touches the repo.
-// Get a key at: https://console.anthropic.com/settings/keys
-const CLAUDE_KEY = 'YOUR_ANTHROPIC_API_KEY_HERE';
+// De.fault now uses Chrome's built-in AI (Gemini Nano via Prompt API).
+// No API key needed. No external calls.
+//
+// To enable:
+// 1. Open chrome://flags in Chrome
+// 2. Search for "Prompt API for Gemini Nano" → Enable
+// 3. Restart Chrome
+// 4. Load/reload the extension at chrome://extensions

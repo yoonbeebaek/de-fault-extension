@@ -866,7 +866,7 @@ async function boot() {
     color:      session.color
   };
 
-  await new Promise(r => setTimeout(r, 1500));
+  await new Promise(r => setTimeout(r, 600));
   if (!getPageContext()) return;
 
   mount(session);

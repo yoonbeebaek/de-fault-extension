@@ -3,10 +3,8 @@
   "name": "De.fault",
   "version": "0.2.0",
   "description": "A de-personalization engine that expands your perspective beyond the algorithmic bubble.",
-  "permissions": ["storage", "activeTab", "tabs", "scripting"],
+  "permissions": ["storage", "activeTab", "tabs", "offscreen"],
   "host_permissions": [
-    "https://*/*",
-    "http://*/*",
     "https://picsum.photos/*"
   ],
   "background": {

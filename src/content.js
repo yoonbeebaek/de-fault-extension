@@ -25,20 +25,20 @@ const DISCIPLINES = [
   {
     key: 'linguistic',
     desc: 'how this topic is named, framed, and contested through language, narrative, and media logic — what rhetoric or discourse shapes the way people understand it',
-    // Blue family — #001FE9 is the anchor
-    colors: ['rgb(0,31,233)','rgb(9,50,122)','rgb(0,55,180)','rgb(20,40,160)','rgb(0,80,210)']
+    // Blue family — from reference palette (row 2)
+    colors: ['rgb(10,80,195)','rgb(8,35,115)','rgb(68,68,108)','rgb(98,138,155)','rgb(0,45,108)']
   },
   {
     key: 'economic',
     desc: 'what systems, institutions, and power structures produce or maintain this topic — who holds power, who benefits, what capital or policy forces are at play',
-    // Red / pink family — #F90000 is the anchor
-    colors: ['rgb(249,0,0)','rgb(180,0,0)','rgb(210,30,60)','rgb(160,0,80)','rgb(220,50,90)']
+    // Red/warm family — from reference palette (row 3): crimson, mauve, magenta, burnt orange, dark brown
+    colors: ['rgb(125,18,18)','rgb(115,65,65)','rgb(175,0,165)','rgb(175,85,8)','rgb(75,48,18)']
   },
   {
     key: 'biological',
     desc: 'how this topic intersects with bodies, health, ecology, or physical systems — what natural, scientific, or evolutionary forces operate beneath the surface',
-    // Green family — #004500 is the anchor
-    colors: ['rgb(0,69,0)','rgb(0,100,40)','rgb(20,80,50)','rgb(0,90,60)','rgb(30,110,70)']
+    // Green family — from reference palette (row 1): emerald, forest, slate-green, olive, dark teal
+    colors: ['rgb(0,128,55)','rgb(0,65,15)','rgb(55,85,70)','rgb(65,75,10)','rgb(0,75,85)']
   }
 ];
 
@@ -471,10 +471,11 @@ function buildStyles(color) {
       padding: 12px 16px;
       display: flex;
       flex-direction: column;
-      gap: 0;
+      justify-content: center;
+      gap: 8px;
       min-width: 0;
     }
-    .card-secondary .card-body { padding: 10px 14px; }
+    .card-secondary .card-body { padding: 10px 14px; gap: 6px; }
 
     /* ── Eyebrow: [icon] TYPE [1px rule] SOURCE [save] ── */
     .eyebrow {
@@ -529,15 +530,13 @@ function buildStyles(color) {
     .btn-save:hover { opacity: 0.85; }
     .btn-save.saved { opacity: 1.0; }
 
-    /* ── Recommendation title — centered vertically in remaining space ── */
+    /* ── Recommendation title ── */
     .card-title {
       font-weight: 400;
       font-size: 16px;
       line-height: 1.30;
       color: rgb(255,255,255);
       text-align: center;
-      margin: auto 0 0;          /* push to vertical center after eyebrow */
-      padding-top: 8px;
       display: -webkit-box;
       -webkit-line-clamp: 3;
       -webkit-box-orient: vertical;
@@ -547,7 +546,6 @@ function buildStyles(color) {
       font-size: 13px;
       line-height: 1.3;
       -webkit-line-clamp: 2;
-      padding-top: 6px;
     }
 
     /* ── Footer — inside the scroll area, sits below cards ── */

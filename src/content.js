@@ -710,7 +710,7 @@ function buildStyles(color) {
     }
     .btn-retry:hover { background: rgba(255,255,255,0.25); }
 
-    /* ── Floating action button (minimized active state → always Activated) ── */
+    /* ── Floating action button (minimized active state) ── */
     .df-fab {
       width: 44px;
       height: 44px;
@@ -718,12 +718,14 @@ function buildStyles(color) {
       border: none;
       padding: 0;
       cursor: pointer;
-      filter: drop-shadow(0 2px 8px rgba(0,0,0,0.12));
-      transition: transform 140ms ease, filter 140ms ease;
+      opacity: 1;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.30);
+      border-radius: 50%;
+      transition: transform 140ms ease, box-shadow 140ms ease;
     }
     .df-fab:hover {
       transform: scale(1.08);
-      filter: drop-shadow(0 4px 16px rgba(0,0,0,0.22));
+      box-shadow: 0 4px 18px rgba(0,0,0,0.40);
     }
     .df-fab:active { transform: scale(0.95); }
     @keyframes df-fab-in {
@@ -812,8 +814,10 @@ function mountInactiveFAB() {
       .df-fab-off {
         width:44px; height:44px;
         background: url("${ext}Floating_inactivated.png") no-repeat center / 44px 44px;
-        border:none; padding:0; display:block;
-        filter: drop-shadow(0 2px 8px rgba(0,0,0,0.12));
+        border:none; padding:0; display:block; cursor:default;
+        opacity: 1;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.30);
+        border-radius: 50%;
       }
     </style>
     <button class="df-fab-off" title="De.fault"></button>
@@ -962,11 +966,14 @@ function fetchPayload() {
   };
 }
 
+let _fetching = false;
 async function loadSuggestions() {
   const key = cacheKey();
   const hit = sessionStorage.getItem(key);
   if (hit) { setCards(renderSuggestions(JSON.parse(hit))); return; }
 
+  if (_fetching) return; // prevent duplicate concurrent fetches
+  _fetching = true;
   setCards(renderLoading());
   try {
     const resp = await chrome.runtime.sendMessage({ type: 'FETCH_SUGGESTIONS', payload: fetchPayload() });
@@ -978,6 +985,8 @@ async function loadSuggestions() {
     }
   } catch (err) {
     setCards(renderError(err?.message || 'Could not reach background — try reloading the page.'));
+  } finally {
+    _fetching = false;
   }
 }
 

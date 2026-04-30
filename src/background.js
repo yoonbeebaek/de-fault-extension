@@ -15,12 +15,11 @@ async function ensureOffscreen() {
   }
 }
 
-// Pre-warm offscreen + AI session on startup so first user request is faster
 ensureOffscreen()
   .then(() => chrome.runtime.sendMessage({ target: 'df-offscreen', type: 'AI_WARMUP' }))
   .catch(() => {});
 
-// ─── Source → domain map (mirrors content.js SOURCE_DOMAINS) ───
+// ─── Source → domain map ───────────────────────────────────────
 const SOURCE_DOMAINS = {
   'bbc': 'bbc.com', 'bbc news': 'bbc.com',
   'new york times': 'nytimes.com', 'nytimes': 'nytimes.com', 'nyt': 'nytimes.com',
@@ -40,15 +39,21 @@ const SOURCE_DOMAINS = {
   'time': 'time.com', 'slate': 'slate.com', 'politico': 'politico.com',
   'axios': 'axios.com', 'propublica': 'propublica.org',
   'national geographic': 'nationalgeographic.com', 'nat geo': 'nationalgeographic.com',
-  'harvard business review': 'hbr.org', 'hbr': 'hbr.org',
+  'hbr': 'hbr.org', 'harvard business review': 'hbr.org',
   'mit technology review': 'technologyreview.com',
-  'ars technica': 'arstechnica.com',
-  'the intercept': 'theintercept.com', 'quartz': 'qz.com',
+  'ars technica': 'arstechnica.com', 'quartz': 'qz.com',
 };
 
-// ─── og:image extraction ───────────────────────────────────────
-// Tries og:image, then twitter:image as fallback.
-function extractImage(html, baseUrl) {
+// ─── Helpers ───────────────────────────────────────────────────
+
+function timedFetch(url, ms = 6000, opts = {}) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  return fetch(url, { ...opts, signal: ctrl.signal })
+    .finally(() => clearTimeout(t));
+}
+
+function extractOgImage(html, base) {
   const patterns = [
     /property=["']og:image(?::url)?["'][^>]*content=["']([^"'\s]{8,})["']/i,
     /content=["']([^"'\s]{8,})["'][^>]*property=["']og:image(?::url)?["']/i,
@@ -58,40 +63,77 @@ function extractImage(html, baseUrl) {
   for (const re of patterns) {
     const m = html.match(re);
     if (!m?.[1]) continue;
-    try {
-      const raw = m[1];
-      return raw.startsWith('http') ? raw : new URL(raw, baseUrl).href;
-    } catch { continue; }
+    try { return m[1].startsWith('http') ? m[1] : new URL(m[1], base).href; }
+    catch { continue; }
   }
   return null;
 }
 
-async function fetchImage(url) {
-  // Reject non-URLs and template placeholders like "https://..."
-  if (!url || !/^https?:\/\/[a-z0-9][-a-z0-9]{0,60}\.[a-z]{2,}(\/|$)/i.test(url)) return null;
+async function fetchOgImage(url) {
+  // Reject template placeholders and bare domains (need a path to be an article)
+  if (!url || !/^https?:\/\/[a-z0-9][-a-z0-9.]{2,}\.[a-z]{2,}\/.+/i.test(url)) return null;
   try {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 7000);
-    const resp = await fetch(url, { signal: ctrl.signal });
-    clearTimeout(timer);
+    const resp = await timedFetch(url);
     if (!resp.ok) return null;
-    const html = await resp.text();
-    return extractImage(html, url);
-  } catch {
-    return null;
-  }
+    return extractOgImage(await resp.text(), url);
+  } catch { return null; }
 }
 
+// ─── Wikipedia image (free, no key, high quality, topic-relevant) ─
+const WIKI_STOP = new Set([
+  'the','a','an','is','are','was','were','how','why','what','when','who',
+  'to','in','of','and','for','that','this','but','with','from','about',
+  'more','than','just','also','over','can','will','does','have','has',
+]);
+
+async function getWikipediaImage(title) {
+  const terms = (title || '')
+    .toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
+    .filter(w => w.length > 3 && !WIKI_STOP.has(w))
+    .slice(0, 3).join(' ');
+  if (!terms) return null;
+
+  try {
+    // Search Wikipedia for the best matching article
+    const searchResp = await timedFetch(
+      `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(terms)}&srlimit=1&format=json&origin=*`
+    );
+    if (!searchResp.ok) return null;
+    const searchData = await searchResp.json();
+    const pageTitle = searchData?.query?.search?.[0]?.title;
+    if (!pageTitle) return null;
+
+    // Fetch the page thumbnail
+    const imgResp = await timedFetch(
+      `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(pageTitle)}&prop=pageimages&format=json&origin=*&pithumbsize=400`
+    );
+    if (!imgResp.ok) return null;
+    const imgData = await imgResp.json();
+    const pages = imgData?.query?.pages || {};
+    return Object.values(pages)[0]?.thumbnail?.source || null;
+  } catch { return null; }
+}
+
+// ─── Thumbnail resolution chain ────────────────────────────────
+// 1. Article og:image (if AI returned a real URL with a path)
+// 2. Wikipedia image for the topic (free, topic-relevant, high quality)
+// 3. Source homepage og:image (brand logo — last resort)
 async function getThumb(s) {
-  // 1. Try the AI-provided URL (real article page)
-  const fromArticle = await fetchImage(s.url);
+  const fromArticle = await fetchOgImage(s.url);
   if (fromArticle) return fromArticle;
 
-  // 2. Fall back to source publication homepage og:image
+  const fromWiki = await getWikipediaImage(s.title);
+  if (fromWiki) return fromWiki;
+
   const domain = SOURCE_DOMAINS[(s.source || '').toLowerCase().trim()];
   if (domain) {
-    const fromDomain = await fetchImage(`https://${domain}`);
-    if (fromDomain) return fromDomain;
+    try {
+      const resp = await timedFetch(`https://${domain}`);
+      if (resp.ok) {
+        const img = extractOgImage(await resp.text(), `https://${domain}`);
+        if (img) return img;
+      }
+    } catch { /* ignore */ }
   }
 
   return null;
@@ -112,7 +154,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           sendResponse({ ok: false, error: 'No response from offscreen AI worker.' });
           return;
         }
-        // Enrich each suggestion with a thumbnail image (parallel, best-effort)
         if (result.ok && Array.isArray(result.data)) {
           result.data = await Promise.all(
             result.data.map(async s => ({ ...s, image: await getThumb(s) }))

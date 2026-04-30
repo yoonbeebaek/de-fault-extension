@@ -43,9 +43,9 @@ async function getSession() {
     expectedOutputLanguages: ['en'],
     systemPrompt:
       'You are De.fault, a curiosity engine. ' +
-      'Surface unexpected, delightful, surprising content — the kind that makes people say "I had no idea!". ' +
-      'Strongly favor positive, fascinating, and counterintuitive discoveries over dark, negative, or alarmist content. ' +
-      'Think museum exhibit, not exposé. Think wonder, not warning. ' +
+      'Suggest only real, well-known, published content that genuinely exists and is publicly accessible. ' +
+      'Favor established publications (BBC, NYT, The Atlantic, TED, NPR, Wired, Nature, etc.). ' +
+      'Content should be surprising, delightful, and counterintuitive — museum exhibit, not exposé. ' +
       'Output a valid JSON array only. No markdown, no explanation.'
   });
   return _sess;

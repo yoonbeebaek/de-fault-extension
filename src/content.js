@@ -468,21 +468,32 @@ function buildStyles(color) {
 
     .card-body {
       flex: 1;
-      padding: 12px 16px;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      gap: 8px;
+      position: relative;
       min-width: 0;
     }
-    .card-secondary .card-body { padding: 10px 14px; gap: 6px; }
 
-    /* ── Eyebrow: [icon] TYPE [1px rule] SOURCE [save] ── */
+    /* ── Eyebrow: fixed at top of card ── */
     .eyebrow {
+      position: absolute;
+      top: 12px;
+      left: 16px;
+      right: 16px;
       display: flex;
       align-items: center;
       gap: 6px;
     }
+    .card-secondary .eyebrow { top: 10px; left: 14px; right: 14px; }
+
+    /* ── Title wrapper: full-height flex, centers title at card midpoint ── */
+    .card-title-wrap {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 16px;
+    }
+    .card-secondary .card-title-wrap { padding: 0 14px; }
 
     .medium-icon { display: flex; align-items: center; flex-shrink: 0; line-height: 0; }
 
@@ -615,21 +626,20 @@ function buildStyles(color) {
     }
     .btn-retry:hover { background: rgba(255,255,255,0.25); }
 
-    /* ── Floating action button ── */
+    /* ── Floating action button (minimized active state → always Activated) ── */
     .df-fab {
       width: 44px;
       height: 44px;
-      background: url("${_EXT}Floating_inactivated.png") no-repeat center / 44px 44px;
+      background: url("${_EXT}Floating_Activated.png") no-repeat center / 44px 44px;
       border: none;
       padding: 0;
       cursor: pointer;
-      filter: drop-shadow(0 2px 8px rgba(0,0,0,0.40));
+      filter: drop-shadow(0 2px 8px rgba(0,0,0,0.12));
       transition: transform 140ms ease, filter 140ms ease;
     }
     .df-fab:hover {
-      background-image: url("${_EXT}Floating_Activated.png");
       transform: scale(1.08);
-      filter: drop-shadow(0 4px 16px rgba(0,0,0,0.55));
+      filter: drop-shadow(0 4px 16px rgba(0,0,0,0.22));
     }
     .df-fab:active { transform: scale(0.95); }
     @keyframes df-fab-in {
@@ -659,7 +669,7 @@ function renderError(message) {
       <div class="error-icon">⚡</div>
       <p class="error-msg">${esc(message)}</p>
       <p class="error-hint">${hint}</p>
-      <button class="btn-retry">다시 시도</button>
+      <button class="btn-retry">Retry</button>
     </div>
   `;
 }
@@ -686,7 +696,7 @@ function renderCard(s, isPrimary, idx) {
             ${ICON_SAVE}
           </button>
         </div>
-        <p class="card-title">${esc(s.title)}</p>
+        <div class="card-title-wrap"><p class="card-title">${esc(s.title)}</p></div>
       </div>
     </div>
   `;
@@ -701,9 +711,32 @@ function renderSuggestions(data) {
 // ─── Overlay ───────────────────────────────────────────────────
 
 let host = null, shadow = null, appState = {};
+let inactiveHost = null;
+
+function mountInactiveFAB() {
+  if (inactiveHost || host) return;
+  inactiveHost = document.createElement('div');
+  inactiveHost.id = 'de-fault-inactive';
+  inactiveHost.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:2147483647;';
+  const sh = inactiveHost.attachShadow({ mode: 'open' });
+  const ext = chrome.runtime.getURL('icons/');
+  sh.innerHTML = `
+    <style>
+      .df-fab-off {
+        width:44px; height:44px;
+        background: url("${ext}Floating_inactivated.png") no-repeat center / 44px 44px;
+        border:none; padding:0; display:block;
+        filter: drop-shadow(0 2px 8px rgba(0,0,0,0.12));
+      }
+    </style>
+    <button class="df-fab-off" title="De.fault"></button>
+  `;
+  document.documentElement.appendChild(inactiveHost);
+}
 
 function mount(session) {
   if (host) return;
+  if (inactiveHost) { inactiveHost.remove(); inactiveHost = null; }
 
   host = document.createElement('div');
   host.id = 'de-fault-root';
@@ -870,10 +903,10 @@ function isContextTriggerable(context, intent) {
 
 async function boot() {
   const pageCtx = getPageContext();
-  if (!pageCtx) return;
+  if (!pageCtx) { mountInactiveFAB(); return; }
 
   const intent = detectIntent(pageCtx.context);
-  if (!isContextTriggerable(pageCtx.context, intent)) return;
+  if (!isContextTriggerable(pageCtx.context, intent)) { mountInactiveFAB(); return; }
 
   const session = initSession(intent);
   appState = {
@@ -921,6 +954,12 @@ if (!window.__dfLoaded) {
 // (handles Medium, Reddit, YouTube, Twitter feed navigation)
 let _dfLastUrl = location.href;
 setInterval(() => {
+  // Re-attach if SPA navigation removed our hosts from the DOM
+  if (host && !document.documentElement.contains(host))
+    document.documentElement.appendChild(host);
+  if (inactiveHost && !document.documentElement.contains(inactiveHost))
+    document.documentElement.appendChild(inactiveHost);
+
   if (location.href === _dfLastUrl || host) return;
   _dfLastUrl = location.href;
   boot();

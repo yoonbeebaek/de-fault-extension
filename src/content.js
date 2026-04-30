@@ -137,31 +137,34 @@ function getPageContext() {
     if (el?.textContent.trim()) return { context: el.textContent.trim() };
   }
 
-  // Article h1
+  // Article h1 — must be specific enough to be an article title
   const h1 = document.querySelector('article h1, main h1, h1');
-  if (h1?.textContent.trim().length >= 15)
-    return { context: h1.textContent.trim().slice(0, 200) };
+  const h1text = h1?.textContent.trim();
+  if (h1text?.length >= 20) return { context: h1text.slice(0, 200) };
 
-  // Open Graph title
-  const og = document.querySelector('meta[property="og:title"]')?.content?.trim();
-  if (og?.length >= 10) return { context: og.slice(0, 200) };
-
-  // Page title — strip site-name suffix
+  // Page title — strip site-name suffix, then require it's actually an article title
+  // (not just the site name left over after stripping)
   const raw = document.title?.trim();
   if (raw?.length >= 10) {
     const clean = raw
       .replace(/\s*[-–—|·•]\s*[^-–—|·•]{1,50}$/, '')
       .replace(/\s*[-–—|·•]\s*[^-–—|·•]{1,50}$/, '')
       .trim();
-    if (clean.length >= 8) return { context: clean };
-    return { context: raw.slice(0, 200) };
+    // Reject if the cleaned title is suspiciously short or looks like a site name
+    // (single word, all title-case, no spaces — these are brand names not article titles)
+    const looksLikeSiteName = clean.length < 20 || !/\s/.test(clean);
+    if (!looksLikeSiteName) return { context: clean };
   }
 
-  // Meta description
+  // Open Graph title (only if distinct from site name — must have spaces/be a sentence)
+  const og = document.querySelector('meta[property="og:title"]')?.content?.trim();
+  if (og?.length >= 20 && /\s/.test(og)) return { context: og.slice(0, 200) };
+
+  // Meta description — last resort, must be substantial
   const desc = document.querySelector(
     'meta[name="description"], meta[property="og:description"]'
   )?.content?.trim();
-  if (desc?.length >= 20) return { context: desc.slice(0, 200) };
+  if (desc?.length >= 40) return { context: desc.slice(0, 200) };
 
   return null;
 }
@@ -992,26 +995,24 @@ async function loadSuggestions() {
 
 // ─── Context relevance gate ────────────────────────────────────
 //
-//  Trigger is curiosity-intent-driven: the detected curiosity type IS
-//  the signal. "I'm open to discovery" is the generic fallback — it
-//  only triggers on known content-rich platforms where depth is certain.
-//  All other specific curiosity intents carry enough signal on their own.
+//  Gate on context quality, not domain whitelist.
+//  TOOL_HOSTS already blocks AI chats, dashboards, etc.
+//  The only remaining question is: is this page about a specific topic?
 
-const TRIGGER_DOMAINS = [
-  'nytimes.com','bbc.com','bbc.co.uk','theguardian.com','washingtonpost.com',
-  'reuters.com','apnews.com','cnn.com','foxnews.com','nbcnews.com',
-  'politico.com','theatlantic.com','bloomberg.com','slate.com','vox.com',
-  'wired.com','economist.com','ft.com','wsj.com','reddit.com',
-  'twitter.com','x.com','threads.net','medium.com','substack.com'
-];
+// Path patterns that are clearly listing/aggregator pages, not single articles
+const LISTING_PATH = /^\/(tag|tags|category|categories|topic|topics|author|authors|search|explore|discover|feed|home|trending|popular|latest|news|all|section|page\/\d)(\/|$|\?)/i;
 
 function isContextTriggerable(context, intent) {
-  if (!context || context.length < 12) return false;
-  if (intent === "I'm open to discovery") {
-    const host = window.location.hostname;
-    return TRIGGER_DOMAINS.some(d => host.includes(d));
-  }
-  return true; // every specific curiosity intent is enough signal
+  if (!context || context.length < 20) return false;
+
+  // Block listing/tag/author/search paths — these are aggregators not articles
+  const path = window.location.pathname;
+  if (LISTING_PATH.test(path)) return false;
+
+  // For the most generic intent, require a longer, more specific context
+  if (intent === "I'm open to discovery" && context.length < 40) return false;
+
+  return true;
 }
 
 // ─── Boot ──────────────────────────────────────────────────────

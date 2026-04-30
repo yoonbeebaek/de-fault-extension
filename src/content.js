@@ -6,15 +6,21 @@
 
 // ─── Copy ──────────────────────────────────────────────────────
 
-const HEADLINES = [
-  'I have something else to show you!',
-  'Shall we explore different perspectives?',
-  'Hey, have you also heard about this?',
-  'Understanding why can also help.',
-  'Wait, have you heard about this?',
-  'Check out their backstory!',
-  'Hope this also motivates you.'
-];
+const ANGLE_HEADLINES = {
+  cause:       ["Understanding why can also help.", "Everything traces back to something."],
+  effect:      ["Here's what this sets in motion.", "The ripple you didn't see coming."],
+  backstory:   ["Check out the backstory!", "This started somewhere unexpected."],
+  opinion:     ["Not everyone agrees on this.", "The debate hiding in plain sight."],
+  adjacent:    ["Hey, have you heard about this?", "Something unexpected lives right next door."],
+  alternative: ["Shall we explore different perspectives?", "There's a completely different way to see this."],
+  contributor: ["More pieces of this puzzle.", "You might be surprised what played a part."],
+  examples:    ["I have something else to show you!", "Real cases that change the picture."],
+};
+
+function pickHeadline(angleKey) {
+  const pool = ANGLE_HEADLINES[angleKey] || ["I have something else to show you!"];
+  return pool[Math.floor(Math.random() * pool.length)];
+}
 
 // ─── Foucault discipline system ────────────────────────────────
 // Three epistemic lenses that shape how De.fault reframes content.
@@ -23,21 +29,18 @@ const HEADLINES = [
 
 const DISCIPLINES = [
   {
-    key: 'linguistic',
-    desc: 'how this topic is named, framed, and contested through language, narrative, and media logic — what rhetoric or discourse shapes the way people understand it',
-    // Blue family — from reference palette (row 2)
+    key: 'communicational',
+    desc: 'how this topic is expressed, debated, and understood through language, media, culture, and narrative — the humanistic and literary lens',
     colors: ['rgb(10,80,195)','rgb(8,35,115)','rgb(68,68,108)','rgb(98,138,155)','rgb(0,45,108)']
   },
   {
-    key: 'economic',
-    desc: 'what systems, institutions, and power structures produce or maintain this topic — who holds power, who benefits, what capital or policy forces are at play',
-    // Red/warm family — from reference palette (row 3): crimson, mauve, magenta, burnt orange, dark brown
+    key: 'economical',
+    desc: 'what economic systems, power structures, and institutions shape this topic — follow the money, the policy, and the authority',
     colors: ['rgb(125,18,18)','rgb(115,65,65)','rgb(175,0,165)','rgb(175,85,8)','rgb(75,48,18)']
   },
   {
-    key: 'biological',
-    desc: 'how this topic intersects with bodies, health, ecology, or physical systems — what natural, scientific, or evolutionary forces operate beneath the surface',
-    // Green family — from reference palette (row 1): emerald, forest, slate-green, olive, dark teal
+    key: 'ecological',
+    desc: 'how this topic connects to bodies, health, nature, and physical systems — the natural science, environmental, and evolutionary lens',
     colors: ['rgb(0,128,55)','rgb(0,65,15)','rgb(55,85,70)','rgb(65,75,10)','rgb(0,75,85)']
   }
 ];
@@ -46,17 +49,17 @@ const DISCIPLINES = [
 // Derived from the Intent × Content matrix.
 
 const UNDER_ANGLES = [
-  { key: 'cause',     desc: 'root cause — what forces, decisions, or history caused this topic to exist or emerge?' },
-  { key: 'effect',    desc: 'downstream consequences — what happens in the world because of this? Who or what is affected?' },
-  { key: 'opinion',   desc: 'contested opinions — what do people fundamentally disagree about regarding this topic?' },
-  { key: 'backstory', desc: 'backstory — what is the historical, political, or biographical origin of this?' },
+  { key: 'cause',     desc: 'surprising origin story — what unexpected forces, decisions, or hidden history caused this to exist? Focus on the counterintuitive and delightful.' },
+  { key: 'effect',    desc: 'fascinating downstream effects — what surprising or hopeful things happen because of this? Look for the counterintuitive and positive.' },
+  { key: 'opinion',   desc: 'the most interesting intellectual debate around this — a perspective that reframes everything and makes you think "I never considered that"' },
+  { key: 'backstory', desc: 'compelling backstory — the fascinating, surprising historical or personal origin that most people don\'t know' },
 ];
 
 const AROUND_ANGLES = [
-  { key: 'adjacent',    desc: 'adjacent topics — what lives conceptually next to this, in a different but related domain?' },
-  { key: 'alternative', desc: 'alternative angles — a completely different paradigm or framework for approaching this topic' },
-  { key: 'contributor', desc: 'topics that played a part — what other forces or events contributed to making this what it is?' },
-  { key: 'examples',    desc: 'illustrative examples — concrete real-world cases that reveal the dynamics of this topic in action' },
+  { key: 'adjacent',    desc: 'delightfully adjacent topics — what surprising field or concept shares deep hidden similarities with this? Prioritize the unexpected and wondrous.' },
+  { key: 'alternative', desc: 'a completely different and more interesting frame for this topic — something that recontextualizes everything in a satisfying way' },
+  { key: 'contributor', desc: 'unexpected contributors — what surprising, little-known forces or people helped make this what it is today?' },
+  { key: 'examples',    desc: 'the most surprising and counterintuitive real-world examples — cases that make you go "I had no idea!" about this topic' },
 ];
 
 // Intent → preferred angle pool (maps curiosity type to content region)
@@ -83,6 +86,9 @@ function anglePool(intent) {
 // Non-content path patterns — signup, about, legal, settings, etc.
 const NON_CONTENT_PATH = /^\/(about|about-us|sign[-_]?(up|in)|log[-_]?(in|out)|register|login|logout|pricing|plans|contact|contact-us|terms|tos|privacy|privacy-policy|cookie|legal|help|faq|support|careers|jobs|press|download|features|404|500|error|settings|account|profile|notifications|subscribe|unsubscribe|welcome|onboarding)(\/|$|\?)/i;
 
+// AI chat / tool interfaces — no readable content topic to de-personalize against
+const TOOL_HOSTS = /^(chat\.openai\.com|chatgpt\.com|claude\.ai|gemini\.google\.com|bard\.google\.com|copilot\.microsoft\.com|perplexity\.ai|character\.ai|poe\.com|you\.com|phind\.com|kagi\.com|chat\.mistral\.ai|huggingface\.co\/chat)/;
+
 function getPageContext() {
   const url  = window.location.href;
   const host = window.location.hostname;
@@ -91,6 +97,7 @@ function getPageContext() {
   if (/^(chrome|chrome-extension|moz-extension|edge|about|data|file|blob):/.test(url)) return null;
   if (/^(localhost|127\.|0\.0\.0\.0)/.test(host)) return null;
   if (/\.(pdf|xml|json|csv|txt)(\?.*)?$/i.test(url)) return null;
+  if (TOOL_HOSTS.test(host)) return null;
 
   // Skip homepages and non-content pages
   if (path === '/' || path === '') return null;
@@ -222,7 +229,7 @@ function initSession(intent) {
 
   let hl = sessionStorage.getItem(SK.hl);
   if (!hl) {
-    hl = HEADLINES[Math.floor(Math.random() * HEADLINES.length)];
+    hl = pickHeadline(angle.key);
     sessionStorage.setItem(SK.hl, hl);
   }
   return { discipline, color, angle, angleIdx: +ai, headline: hl };
@@ -253,6 +260,14 @@ function esc(s) {
 
 function imgUrl(query, size, idx) {
   return `https://picsum.photos/seed/${hashStr((query || '') + idx)}/${size}/${size}`;
+}
+
+function cardUrl(s) {
+  const type = (s.type || 'ARTICLE').toUpperCase();
+  const q = encodeURIComponent((s.title || '') + ' ' + (s.source || ''));
+  if (type === 'VIDEO') return `https://www.youtube.com/results?search_query=${encodeURIComponent(s.title || '')}`;
+  if (type === 'AUDIO') return `https://www.google.com/search?q=${q}+podcast`;
+  return `https://www.google.com/search?q=${q}`;
 }
 
 // ─── Icon URLs — resolved once at load time ────────────────────
@@ -322,8 +337,7 @@ function buildStyles(color) {
       height: min(510px, calc(100vh - 52px));
       border-radius: 6px;
       overflow: hidden;
-      background: ${color};
-      /* Subtle 5%→0% black gradient top→bottom */
+      background: var(--df-bg);
       background-image: linear-gradient(rgba(0,0,0,0.05) 0%, rgba(0,0,0,0) 100%);
       background-blend-mode: multiply;
       box-shadow: 0 8px 24px -6px rgba(0,0,0,0.22), 0 2px 6px rgba(0,0,0,0.14);
@@ -680,7 +694,7 @@ function renderCard(s, isPrimary, idx) {
   const size  = isPrimary ? 172 : 100;
 
   return `
-    <div class="card ${isPrimary ? 'card-primary' : 'card-secondary'}">
+    <div class="card ${isPrimary ? 'card-primary' : 'card-secondary'}" data-url="${esc(cardUrl(s))}" role="link" tabindex="0">
       <img class="card-img"
            src="${imgUrl(s.imageQuery || s.title, size, idx)}"
            alt=""
@@ -740,7 +754,7 @@ function mount(session) {
 
   host = document.createElement('div');
   host.id = 'de-fault-root';
-  host.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:2147483647;';
+  host.style.cssText = `position:fixed;bottom:24px;right:24px;z-index:2147483647;--df-bg:${session.color};`;
 
   shadow = host.attachShadow({ mode: 'open' });
   shadow.innerHTML = `
@@ -817,14 +831,32 @@ async function handleRefresh() {
   if (!btn) return;
 
   btn.classList.remove('spin');
-  void btn.offsetWidth;            // reflow to restart animation
+  void btn.offsetWidth;
   btn.classList.add('spin');
   setTimeout(() => btn.classList.remove('spin'), 600);
 
+  // Rotate angle
   const { angle, angleIdx } = rotateAngle(appState.intent, appState.angleIdx);
   appState.angle    = angle;
   appState.angleIdx = angleIdx;
-  const hl = pick(HEADLINES);
+
+  // Rotate discipline (random) + color (always different from current)
+  const oldDiIdx = +sessionStorage.getItem(SK.discipline);
+  const oldCi    = +sessionStorage.getItem(SK.color);
+  const newDiIdx = Math.floor(Math.random() * DISCIPLINES.length);
+  const discipline = DISCIPLINES[newDiIdx];
+  sessionStorage.setItem(SK.discipline, newDiIdx);
+  let newCi = Math.floor(Math.random() * discipline.colors.length);
+  if (newDiIdx === oldDiIdx && newCi === oldCi && discipline.colors.length > 1)
+    newCi = (newCi + 1) % discipline.colors.length;
+  sessionStorage.setItem(SK.color, newCi);
+  const newColor = discipline.colors[newCi];
+  appState.discipline = discipline;
+  appState.color      = newColor;
+  host.style.setProperty('--df-bg', newColor);
+
+  // Headline tied to new angle
+  const hl = pickHeadline(angle.key);
   sessionStorage.setItem(SK.hl, hl);
   if (shadow) shadow.getElementById('headline').textContent = hl;
 
@@ -835,9 +867,10 @@ function handleCardsClick(e) {
   if (e.target.closest('.btn-retry')) { loadSuggestions(); return; }
 
   const saveBtn = e.target.closest('.btn-save');
-  if (saveBtn) {
-    saveBtn.classList.toggle('saved');
-  }
+  if (saveBtn) { saveBtn.classList.toggle('saved'); return; }
+
+  const card = e.target.closest('.card[data-url]');
+  if (card?.dataset.url) chrome.tabs.create({ url: card.dataset.url });
 }
 
 // ─── Data ──────────────────────────────────────────────────────

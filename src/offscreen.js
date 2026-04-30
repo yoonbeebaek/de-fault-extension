@@ -20,7 +20,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // Gemini Nano session creation is the main source of latency.
 // Cache one session and reuse it — destroy only if model changes.
 let _lm   = null;   // language model API reference
-let _sess = null;   // active session
+let _sess = null;   // active session — recreated fresh on each offscreen document load
 
 async function getLM() {
   if (_lm) return _lm;
@@ -103,7 +103,8 @@ async function runAI({ context, intent, contentTypeDesc, disciplineKey, discipli
       `3 real surprising suggestions (articles/videos/podcasts). JSON only:\n` +
       `[{"title":"...","source":"...","url":"https://...","type":"ARTICLE"},` +
       `{"title":"...","source":"...","url":"https://...","type":"VIDEO"},` +
-      `{"title":"...","source":"...","url":"https://...","type":"AUDIO"}]`
+      `{"title":"...","source":"...","url":"https://...","type":"AUDIO"}]`,
+      { expectedOutputLanguages: ['en'] }
     );
   } catch (e) {
     _sess = null;

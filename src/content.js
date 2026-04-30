@@ -258,10 +258,6 @@ function esc(s) {
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function imgUrl(query, size, idx) {
-  return `https://picsum.photos/seed/${hashStr((query || '') + idx)}/${size}/${size}`;
-}
-
 function cardUrl(s) {
   const type = (s.type || 'ARTICLE').toUpperCase();
   const q = encodeURIComponent((s.title || '') + ' ' + (s.source || ''));
@@ -470,15 +466,30 @@ function buildStyles(color) {
     .card-primary   { height: 172px; flex-shrink: 0; }
     .card-secondary { height: 100px; flex-shrink: 0; }
 
-    /* Square images with rounded left corners only */
-    .card-img {
+    /* ── Thumbnail panel — styled placeholder with media icon ── */
+    .card-thumb {
       flex-shrink: 0;
-      object-fit: cover;
-      display: block;
-      background: rgb(217,217,217);   /* --neutral-gray fallback */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.28);
+      border-radius: 3px 0 0 3px;
+      position: relative;
+      overflow: hidden;
     }
-    .card-primary   .card-img { width: 172px; height: 172px; border-radius: 3px 0 0 3px; }
-    .card-secondary .card-img { width: 100px; height: 100px; border-radius: 3px 0 0 3px; }
+    .card-thumb::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at 35% 35%, rgba(255,255,255,0.10) 0%, transparent 65%);
+      pointer-events: none;
+    }
+    .card-primary   .card-thumb { width: 172px; height: 172px; }
+    .card-secondary .card-thumb { width: 100px; height: 100px; }
+
+    .card-thumb-icon { display: flex; align-items: center; justify-content: center; opacity: 0.45; position: relative; z-index: 1; }
+    .card-primary   .card-thumb-icon img { width: 44px; height: 44px; }
+    .card-secondary .card-thumb-icon img { width: 26px; height: 26px; }
 
     .card-body {
       flex: 1;
@@ -499,6 +510,7 @@ function buildStyles(color) {
     .card-secondary .eyebrow { top: 10px; left: 14px; right: 14px; }
 
     /* ── Title wrapper: full-height flex, centers title at card midpoint ── */
+    /* pointer-events:none lets clicks pass through to .card and eyebrow buttons */
     .card-title-wrap {
       position: absolute;
       inset: 0;
@@ -506,8 +518,11 @@ function buildStyles(color) {
       align-items: center;
       justify-content: flex-start;
       padding: 0 16px;
+      padding-top: 32px;   /* clear eyebrow */
+      pointer-events: none;
     }
-    .card-secondary .card-title-wrap { padding: 0 14px; }
+    .card-secondary .card-title-wrap { padding: 0 14px; padding-top: 28px; }
+    .card-title { pointer-events: none; }
 
     .medium-icon { display: flex; align-items: center; flex-shrink: 0; line-height: 0; }
 
@@ -691,15 +706,12 @@ function renderError(message) {
 function renderCard(s, isPrimary, idx) {
   const type  = (s.type || 'ARTICLE').toUpperCase();
   const micon = MEDIUM_ICONS[type] || MEDIUM_ICONS.ARTICLE;
-  const size  = isPrimary ? 172 : 100;
 
   return `
     <div class="card ${isPrimary ? 'card-primary' : 'card-secondary'}" data-url="${esc(cardUrl(s))}" role="link" tabindex="0">
-      <img class="card-img"
-           src="${imgUrl(s.imageQuery || s.title, size, idx)}"
-           alt=""
-           loading="${isPrimary ? 'eager' : 'lazy'}"
-           onerror="this.style.opacity='0'">
+      <div class="card-thumb">
+        <div class="card-thumb-icon">${micon}</div>
+      </div>
       <div class="card-body">
         <div class="eyebrow">
           <span class="medium-icon">${micon}</span>
@@ -870,7 +882,7 @@ function handleCardsClick(e) {
   if (saveBtn) { saveBtn.classList.toggle('saved'); return; }
 
   const card = e.target.closest('.card[data-url]');
-  if (card?.dataset.url) chrome.tabs.create({ url: card.dataset.url });
+  if (card?.dataset.url) window.open(card.dataset.url, '_blank', 'noopener');
 }
 
 // ─── Data ──────────────────────────────────────────────────────

@@ -39,6 +39,7 @@ async function getSession() {
   _sess = await lm.create({
     temperature: 0.9,
     topK: 40,
+    expectedInputLanguages: ['en'],
     expectedOutputLanguages: ['en'],
     systemPrompt:
       'You are De.fault, a curiosity engine. ' +
@@ -104,7 +105,6 @@ async function runAI({ context, intent, contentTypeDesc, disciplineKey, discipli
       `[{"title":"...","source":"...","url":"https://...","type":"ARTICLE"},` +
       `{"title":"...","source":"...","url":"https://...","type":"VIDEO"},` +
       `{"title":"...","source":"...","url":"https://...","type":"AUDIO"}]`,
-      { expectedOutputLanguages: ['en'] }
     );
   } catch (e) {
     _sess = null;

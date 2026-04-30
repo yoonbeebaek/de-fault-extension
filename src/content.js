@@ -258,10 +258,55 @@ function esc(s) {
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// Known source → domain mappings for site-specific fallback search
+const SOURCE_DOMAINS = {
+  'bbc': 'bbc.com', 'bbc news': 'bbc.com',
+  'new york times': 'nytimes.com', 'nytimes': 'nytimes.com', 'nyt': 'nytimes.com',
+  'the guardian': 'theguardian.com', 'guardian': 'theguardian.com',
+  'washington post': 'washingtonpost.com', 'wapo': 'washingtonpost.com',
+  'the atlantic': 'theatlantic.com', 'atlantic': 'theatlantic.com',
+  'wired': 'wired.com', 'ted': 'ted.com', 'ted talks': 'ted.com',
+  'npr': 'npr.org', 'youtube': 'youtube.com', 'spotify': 'spotify.com',
+  'medium': 'medium.com', 'reuters': 'reuters.com', 'bloomberg': 'bloomberg.com',
+  'vox': 'vox.com', 'the verge': 'theverge.com', 'verge': 'theverge.com',
+  'techcrunch': 'techcrunch.com', 'nature': 'nature.com',
+  'scientific american': 'scientificamerican.com', 'sci am': 'scientificamerican.com',
+  'new yorker': 'newyorker.com', 'the new yorker': 'newyorker.com',
+  'economist': 'economist.com', 'the economist': 'economist.com',
+  'ft': 'ft.com', 'financial times': 'ft.com',
+  'wsj': 'wsj.com', 'wall street journal': 'wsj.com',
+  'time': 'time.com', 'slate': 'slate.com', 'politico': 'politico.com',
+  'axios': 'axios.com', 'propublica': 'propublica.org',
+  'national geographic': 'nationalgeographic.com', 'nat geo': 'nationalgeographic.com',
+  'harvard business review': 'hbr.org', 'hbr': 'hbr.org',
+  'mit technology review': 'technologyreview.com',
+  'ars technica': 'arstechnica.com', 'arstechnica': 'arstechnica.com',
+  'the intercept': 'theintercept.com', 'quartz': 'qz.com',
+  'wikipedia': 'wikipedia.org', 'reddit': 'reddit.com',
+};
+
 function cardUrl(s) {
   const type = (s.type || 'ARTICLE').toUpperCase();
-  const q = encodeURIComponent((s.title || '') + ' ' + (s.source || ''));
-  if (type === 'VIDEO') return `https://www.youtube.com/results?search_query=${encodeURIComponent(s.title || '')}`;
+  const title = s.title || '';
+  const source = s.source || '';
+
+  // 1. Use AI-provided URL if it's a real link (not the template placeholder)
+  if (s.url && /^https?:\/\/[a-z0-9][-a-z0-9.]{2,}\.[a-z]{2,}(\/\S+)/i.test(s.url)) {
+    return s.url;
+  }
+
+  // 2. Site-specific search: shows results only from the source publication
+  const domain = SOURCE_DOMAINS[(source).toLowerCase().trim()];
+  const titleEnc = encodeURIComponent(title);
+  if (type === 'VIDEO') {
+    return `https://www.youtube.com/results?search_query=${encodeURIComponent(title + ' ' + source)}`;
+  }
+  if (domain) {
+    return `https://www.google.com/search?q=site:${domain}+${titleEnc}`;
+  }
+
+  // 3. Generic Google search as last resort
+  const q = encodeURIComponent(title + ' ' + source);
   if (type === 'AUDIO') return `https://www.google.com/search?q=${q}+podcast`;
   return `https://www.google.com/search?q=${q}`;
 }

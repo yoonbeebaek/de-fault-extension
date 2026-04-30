@@ -167,3 +167,4 @@ function extractSuggestions(raw) {
     }
   }
   return items.length ? items : null;
+}

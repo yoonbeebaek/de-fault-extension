@@ -101,9 +101,9 @@ async function runAI({ context, intent, contentTypeDesc, disciplineKey, discipli
       `Lens: ${disciplineKey} — ${disciplineDesc}\n` +
       `Topic: "${context}". Intent: "${intent}". Angle: ${contentTypeDesc}\n\n` +
       `3 real surprising suggestions (articles/videos/podcasts). JSON only:\n` +
-      `[{"title":"...","source":"...","type":"ARTICLE"},` +
-      `{"title":"...","source":"...","type":"VIDEO"},` +
-      `{"title":"...","source":"...","type":"AUDIO"}]`
+      `[{"title":"...","source":"...","url":"https://...","type":"ARTICLE"},` +
+      `{"title":"...","source":"...","url":"https://...","type":"VIDEO"},` +
+      `{"title":"...","source":"...","url":"https://...","type":"AUDIO"}]`
     );
   } catch (e) {
     _sess = null;

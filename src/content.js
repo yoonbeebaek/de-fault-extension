@@ -466,7 +466,7 @@ function buildStyles(color) {
     .card-primary   { height: 172px; flex-shrink: 0; }
     .card-secondary { height: 100px; flex-shrink: 0; }
 
-    /* ── Thumbnail panel — styled placeholder with media icon ── */
+    /* ── Thumbnail panel ── */
     .card-thumb {
       flex-shrink: 0;
       display: flex;
@@ -477,17 +477,26 @@ function buildStyles(color) {
       position: relative;
       overflow: hidden;
     }
-    .card-thumb::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: radial-gradient(ellipse at 35% 35%, rgba(255,255,255,0.10) 0%, transparent 65%);
-      pointer-events: none;
-    }
     .card-primary   .card-thumb { width: 172px; height: 172px; }
     .card-secondary .card-thumb { width: 100px; height: 100px; }
 
-    .card-thumb-icon { display: flex; align-items: center; justify-content: center; opacity: 0.45; position: relative; z-index: 1; }
+    /* Real og:image — covers the thumb panel */
+    .card-thumb-img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    /* Fallback icon (shown when no og:image) */
+    .card-thumb-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0.40;
+    }
     .card-primary   .card-thumb-icon img { width: 44px; height: 44px; }
     .card-secondary .card-thumb-icon img { width: 26px; height: 26px; }
 
@@ -706,12 +715,13 @@ function renderError(message) {
 function renderCard(s, isPrimary, idx) {
   const type  = (s.type || 'ARTICLE').toUpperCase();
   const micon = MEDIUM_ICONS[type] || MEDIUM_ICONS.ARTICLE;
+  const thumbInner = s.image
+    ? `<img class="card-thumb-img" src="${esc(s.image)}" alt="" loading="${isPrimary ? 'eager' : 'lazy'}" onerror="this.style.display='none'">`
+    : `<div class="card-thumb-icon">${micon}</div>`;
 
   return `
     <div class="card ${isPrimary ? 'card-primary' : 'card-secondary'}" data-url="${esc(cardUrl(s))}" role="link" tabindex="0">
-      <div class="card-thumb">
-        <div class="card-thumb-icon">${micon}</div>
-      </div>
+      <div class="card-thumb">${thumbInner}</div>
       <div class="card-body">
         <div class="eyebrow">
           <span class="medium-icon">${micon}</span>

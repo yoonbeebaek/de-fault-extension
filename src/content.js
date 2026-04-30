@@ -311,23 +311,6 @@ function cardUrl(s) {
   return `https://www.google.com/search?q=${q}`;
 }
 
-const STOP_WORDS = new Set([
-  'the','a','an','is','are','was','were','be','been','have','has','had',
-  'how','why','what','when','who','will','can','could','should','would',
-  'to','in','of','and','for','that','this','but','with','from','its',
-  'by','as','on','at','into','about','more','than','just','also','over',
-]);
-
-function thumbUrl(s, size) {
-  const keywords = (s.title || s.source || 'curiosity')
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .split(/\s+/)
-    .filter(w => w.length > 3 && !STOP_WORDS.has(w))
-    .slice(0, 2)
-    .join(',') || 'curiosity';
-  return `https://loremflickr.com/${size}/${size}/${encodeURIComponent(keywords)}`;
-}
 
 // ─── Icon URLs — resolved once at load time ────────────────────
 const _EXT = chrome.runtime.getURL('icons/');
@@ -778,18 +761,18 @@ function renderError(message) {
 function renderCard(s, isPrimary, idx) {
   const type  = (s.type || 'ARTICLE').toUpperCase();
   const micon = MEDIUM_ICONS[type] || MEDIUM_ICONS.ARTICLE;
-  const size  = isPrimary ? 172 : 100;
-
-  return `
-    <div class="card ${isPrimary ? 'card-primary' : 'card-secondary'}" data-url="${esc(cardUrl(s))}" role="link" tabindex="0">
-      <div class="card-thumb">
-        <img class="card-thumb-img"
-             src="${esc(thumbUrl(s, size))}"
+  const thumbInner = s.image
+    ? `<img class="card-thumb-img"
+             src="${esc(s.image)}"
              alt=""
              loading="${isPrimary ? 'eager' : 'lazy'}"
              onerror="this.style.display='none';this.parentElement.querySelector('.card-thumb-icon').style.display='flex'">
-        <div class="card-thumb-icon" style="display:none">${micon}</div>
-      </div>
+       <div class="card-thumb-icon" style="display:none">${micon}</div>`
+    : `<div class="card-thumb-icon">${micon}</div>`;
+
+  return `
+    <div class="card ${isPrimary ? 'card-primary' : 'card-secondary'}" data-url="${esc(cardUrl(s))}" role="link" tabindex="0">
+      <div class="card-thumb">${thumbInner}</div>
       <div class="card-body">
         <div class="eyebrow">
           <span class="medium-icon">${micon}</span>

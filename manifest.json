@@ -5,7 +5,8 @@
   "description": "A de-personalization engine that expands your perspective beyond the algorithmic bubble.",
   "permissions": ["storage", "activeTab", "tabs", "offscreen"],
   "host_permissions": [
-    "https://loremflickr.com/*"
+    "https://*/*",
+    "http://*/*"
   ],
   "background": {
     "service_worker": "src/background.js"

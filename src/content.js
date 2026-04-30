@@ -504,7 +504,7 @@ function buildStyles(color) {
       inset: 0;
       display: flex;
       align-items: center;
-      justify-content: center;
+      justify-content: flex-start;
       padding: 0 16px;
     }
     .card-secondary .card-title-wrap { padding: 0 14px; }
@@ -561,7 +561,7 @@ function buildStyles(color) {
       font-size: 16px;
       line-height: 1.30;
       color: rgb(255,255,255);
-      text-align: center;
+      text-align: left;
       display: -webkit-box;
       -webkit-line-clamp: 3;
       -webkit-box-orient: vertical;

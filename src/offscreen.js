@@ -39,6 +39,7 @@ async function getSession() {
   _sess = await lm.create({
     temperature: 0.9,
     topK: 40,
+    expectedOutputLanguages: ['en'],
     systemPrompt:
       'You are De.fault, a curiosity engine. ' +
       'Surface unexpected, delightful, surprising content — the kind that makes people say "I had no idea!". ' +

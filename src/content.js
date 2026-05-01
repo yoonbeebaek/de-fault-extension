@@ -89,6 +89,148 @@ const NON_CONTENT_PATH = /^\/(about|about-us|sign[-_]?(up|in)|log[-_]?(in|out)|r
 // AI chat / tool interfaces — no readable content topic to de-personalize against
 const TOOL_HOSTS = /^(chat\.openai\.com|chatgpt\.com|claude\.ai|gemini\.google\.com|bard\.google\.com|copilot\.microsoft\.com|perplexity\.ai|character\.ai|poe\.com|you\.com|phind\.com|kagi\.com|chat\.mistral\.ai|huggingface\.co\/chat)/;
 
+// ─── Content classification pipeline ──────────────────────────
+//
+//  4-tier waterfall (priority order):
+//   1. Schema.org JSON-LD  — highest confidence
+//   2. Open Graph og:type  — widely supported
+//   3. Platform URL rules  — for giants that skip web standards
+//   4. DOM heuristics      — text density + article URL pattern (last resort)
+//
+//  Returns one of: 'article' | 'video' | 'audio' | 'product' | 'book' | 'search' | 'unknown'
+//  Adding a new content type = add one checker object to contentCheckers.
+
+// Parse all JSON-LD blocks; return first node that has @type
+let _ldData;
+function getJsonLd() {
+  if (_ldData !== undefined) return _ldData;
+  _ldData = null;
+  for (const s of document.querySelectorAll('script[type="application/ld+json"]')) {
+    try {
+      let items = JSON.parse(s.textContent);
+      if (!Array.isArray(items)) items = [items];
+      for (const item of items) {
+        const nodes = Array.isArray(item['@graph']) ? item['@graph'] : [item];
+        for (const node of nodes) {
+          if (node['@type']) {
+            const t = Array.isArray(node['@type']) ? node['@type'][0] : node['@type'];
+            _ldData = { type: String(t).toLowerCase(), data: node };
+            return _ldData;
+          }
+        }
+      }
+    } catch { /* malformed JSON-LD — skip */ }
+  }
+  return null;
+}
+
+// Article URL patterns: date slugs, /article/, /story/, long kebab slugs, numeric IDs
+const ARTICLE_URL_RE = /\/(20\d\d[\/\-]\d\d|article|story|post|news|opinion|feature|magazine|column|blog)[\/-]|\/[a-z0-9-]{30,}(\/|$)|\/\d{5,}(\/|$)/i;
+
+// Listing/aggregator path patterns — clearly not a single content page
+const LISTING_PATH_RE = /^\/(tag|tags|category|categories|topic|topics|author|authors|search|explore|discover|feed|home|trending|popular|latest|news|all|section|page\/\d)(\/|$|\?)/i;
+
+// Text density fallback: ≥3 paragraphs with ≥50 non-whitespace chars = article body present
+function hasArticleTextDensity() {
+  let count = 0;
+  for (const p of document.querySelectorAll('article p, main p, .post-body p, .entry-content p, p')) {
+    if (p.textContent.replace(/\s/g, '').length >= 50) { count++; if (count >= 3) return true; }
+  }
+  return false;
+}
+
+const contentCheckers = [
+  {
+    type: 'search',
+    check(host, _path, url) {
+      return /google\.[a-z.]+\/search/.test(url) && !!new URLSearchParams(window.location.search).get('q');
+    }
+  },
+  {
+    type: 'video',
+    check(host, path) {
+      const ld = getJsonLd();
+      if (ld && /^(videoobject|movie|tvseries|tvepisode|videogame)$/.test(ld.type)) return true;
+      const og = document.querySelector('meta[property="og:type"]')?.content?.toLowerCase() || '';
+      if (og.startsWith('video')) return true;
+      if (host.includes('youtube.com') && path.startsWith('/watch')) return true;
+      if (host.includes('vimeo.com') && /^\/\d+/.test(path)) return true;
+      if (host.includes('twitch.tv') && /^\/videos\//.test(path)) return true;
+      if (host.includes('tiktok.com') && /\/@.+\/video\//.test(path)) return true;
+      return false;
+    }
+  },
+  {
+    type: 'audio',
+    check(host, path) {
+      const ld = getJsonLd();
+      if (ld && /^(audioobject|podcast|podcastepisode|musicrecording|musicalbum)$/.test(ld.type)) return true;
+      const og = document.querySelector('meta[property="og:type"]')?.content?.toLowerCase() || '';
+      if (og.startsWith('music') || og.startsWith('audio')) return true;
+      if (host.includes('spotify.com') && /\/(episode|track|show)\//.test(path)) return true;
+      if (host.includes('podcasts.apple.com')) return true;
+      if (host.includes('soundcloud.com') && path.split('/').filter(Boolean).length >= 2) return true;
+      if (host.includes('music.youtube.com') && path.startsWith('/watch')) return true;
+      return false;
+    }
+  },
+  {
+    type: 'product',
+    check(host, path) {
+      const ld = getJsonLd();
+      if (ld && /^(product|offer)$/.test(ld.type)) return true;
+      const og = document.querySelector('meta[property="og:type"]')?.content?.toLowerCase() || '';
+      if (og === 'product') return true;
+      if (host.includes('amazon.') && /\/(dp|gp\/product)\//.test(path)) return true;
+      if (host.includes('etsy.com') && /\/listing\//.test(path)) return true;
+      if (/\/products?\/[a-z0-9-]{5,}(\/|$)/i.test(path)) return true;
+      return false;
+    }
+  },
+  {
+    type: 'book',
+    check(host, path) {
+      const ld = getJsonLd();
+      if (ld && /^(book|audiobook)$/.test(ld.type)) return true;
+      const og = document.querySelector('meta[property="og:type"]')?.content?.toLowerCase() || '';
+      if (og === 'book') return true;
+      if (host.includes('goodreads.com') && /\/book\/show\//.test(path)) return true;
+      if (host.includes('books.google.com')) return true;
+      return false;
+    }
+  },
+  {
+    type: 'article',
+    check(host, path, url) {
+      // Tier 1: JSON-LD @type
+      const ld = getJsonLd();
+      if (ld && /^(article|newsarticle|blogposting|reportage|review|technicalarticle|scholarlyarticle|opinionarticle)$/.test(ld.type)) return true;
+      // Tier 2: og:type or article:published_time (strong article signal)
+      const og = document.querySelector('meta[property="og:type"]')?.content?.toLowerCase() || '';
+      if (og === 'article') return true;
+      if (document.querySelector('meta[property="article:published_time"]')) return true;
+      // Fast fail: homepages and listing aggregator paths
+      if (path === '/' || path === '') return false;
+      if (LISTING_PATH_RE.test(path)) return false;
+      // Tier 3: URL structure
+      if (ARTICLE_URL_RE.test(url)) return true;
+      // Tier 4: text density
+      return hasArticleTextDensity();
+    }
+  },
+];
+
+// Returns the page's content type, or 'unknown' if no checker matches.
+function classifyContent() {
+  const host = window.location.hostname;
+  const path = window.location.pathname;
+  const url  = window.location.href;
+  for (const checker of contentCheckers) {
+    if (checker.check(host, path, url)) return checker.type;
+  }
+  return 'unknown';
+}
+
 function getPageContext() {
   const url  = window.location.href;
   const host = window.location.hostname;
@@ -137,34 +279,33 @@ function getPageContext() {
     if (el?.textContent.trim()) return { context: el.textContent.trim() };
   }
 
-  // Article h1 — must be specific enough to be an article title
+  // classifyContent() decides if this page is worth showing De.fault on;
+  // getPageContext() just extracts the best available text — thresholds are loose.
+
+  // Article / page h1
   const h1 = document.querySelector('article h1, main h1, h1');
   const h1text = h1?.textContent.trim();
-  if (h1text?.length >= 20) return { context: h1text.slice(0, 200) };
+  if (h1text?.length >= 8) return { context: h1text.slice(0, 200) };
 
-  // Page title — strip site-name suffix, then require it's actually an article title
-  // (not just the site name left over after stripping)
+  // Page <title> — strip site-name suffix
   const raw = document.title?.trim();
   if (raw?.length >= 10) {
     const clean = raw
       .replace(/\s*[-–—|·•]\s*[^-–—|·•]{1,50}$/, '')
       .replace(/\s*[-–—|·•]\s*[^-–—|·•]{1,50}$/, '')
       .trim();
-    // Reject if the cleaned title is suspiciously short or looks like a site name
-    // (single word, all title-case, no spaces — these are brand names not article titles)
-    const looksLikeSiteName = clean.length < 20 || !/\s/.test(clean);
-    if (!looksLikeSiteName) return { context: clean };
+    if (clean.length >= 8) return { context: clean };
   }
 
-  // Open Graph title (only if distinct from site name — must have spaces/be a sentence)
+  // Open Graph title
   const og = document.querySelector('meta[property="og:title"]')?.content?.trim();
-  if (og?.length >= 20 && /\s/.test(og)) return { context: og.slice(0, 200) };
+  if (og?.length >= 8) return { context: og.slice(0, 200) };
 
-  // Meta description — last resort, must be substantial
+  // Meta description — last resort
   const desc = document.querySelector(
     'meta[name="description"], meta[property="og:description"]'
   )?.content?.trim();
-  if (desc?.length >= 40) return { context: desc.slice(0, 200) };
+  if (desc?.length >= 20) return { context: desc.slice(0, 200) };
 
   return null;
 }
@@ -996,23 +1137,13 @@ async function loadSuggestions() {
 
 // ─── Context relevance gate ────────────────────────────────────
 //
-//  Gate on context quality, not domain whitelist.
-//  TOOL_HOSTS already blocks AI chats, dashboards, etc.
-//  The only remaining question is: is this page about a specific topic?
-
-// Path patterns that are clearly listing/aggregator pages, not single articles
-const LISTING_PATH = /^\/(tag|tags|category|categories|topic|topics|author|authors|search|explore|discover|feed|home|trending|popular|latest|news|all|section|page\/\d)(\/|$|\?)/i;
+//  classifyContent() already decided the page type.
+//  This gate only checks context text quality (length floor).
 
 function isContextTriggerable(context, intent) {
-  if (!context || context.length < 20) return false;
-
-  // Block listing/tag/author/search paths — these are aggregators not articles
-  const path = window.location.pathname;
-  if (LISTING_PATH.test(path)) return false;
-
-  // For the most generic intent, require a longer, more specific context
-  if (intent === "I'm open to discovery" && context.length < 40) return false;
-
+  if (!context || context.length < 10) return false;
+  // For the most generic intent, require a more substantive context string
+  if (intent === "I'm open to discovery" && context.length < 30) return false;
   return true;
 }
 
@@ -1021,6 +1152,9 @@ function isContextTriggerable(context, intent) {
 async function boot() {
   const pageCtx = getPageContext();
   if (!pageCtx) { mountInactiveFAB(); return; }
+
+  const pageType = classifyContent();
+  if (pageType === 'unknown') { mountInactiveFAB(); return; }
 
   const intent = detectIntent(pageCtx.context);
   if (!isContextTriggerable(pageCtx.context, intent)) { mountInactiveFAB(); return; }

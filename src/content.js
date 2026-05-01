@@ -577,9 +577,10 @@ function buildStyles(color) {
       justify-content: flex-start;
       padding: 0 16px;
       padding-top: 32px;   /* clear eyebrow */
+      padding-bottom: 24px; /* compensate so center sits 12px higher than eyebrow-biased midpoint */
       pointer-events: none;
     }
-    .card-secondary .card-title-wrap { padding: 0 14px; padding-top: 28px; }
+    .card-secondary .card-title-wrap { padding: 0 14px; padding-top: 28px; padding-bottom: 20px; }
     .card-title { pointer-events: none; }
 
     .medium-icon { display: flex; align-items: center; flex-shrink: 0; line-height: 0; }

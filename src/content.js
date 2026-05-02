@@ -453,8 +453,8 @@ const ICON_SHRINK = `<svg width="15" height="15" viewBox="0 0 15 15" fill="curre
   <path d="M7.5 0a7.5 7.5 0 110 15 7.5 7.5 0 010-15zM4.17 6.9a.6.6 0 100 1.2h6.66a.6.6 0 100-1.2z"/>
 </svg>`;
 
-// Save — user's Menu.png; CSS opacity drives ghost (inactive) → white (saved) state
-const ICON_SAVE = `<img src="${_EXT}Menu.png" width="14" height="14" alt="" style="display:block;">`;
+// Save — empty placeholder; actual icon swapped via CSS background-image in buildStyles()
+const ICON_SAVE = ``;
 
 // Content-type badges — user's uploaded PNGs
 const MEDIUM_ICONS = {
@@ -740,18 +740,17 @@ function buildStyles(color) {
     /* save icon — marginLeft:auto pushes to right edge */
     .btn-save {
       margin-left: auto;
-      background: none;
+      width: 14px;
+      height: 14px;
+      background: url("${ext}icons/Save_Default.png") no-repeat center / contain;
       border: none;
       cursor: pointer;
       padding: 0;
-      display: flex;
-      align-items: center;
       flex-shrink: 0;
-      opacity: 0.38;
-      transition: opacity 120ms ease;
+      transition: background-image 80ms ease;
     }
-    .btn-save:hover { opacity: 0.85; }
-    .btn-save.saved { opacity: 1.0; }
+    .btn-save:hover  { background-image: url("${ext}icons/Save_Hover.png"); }
+    .btn-save.saved  { background-image: url("${ext}icons/Save_Hover.png"); }
 
     /* ── Recommendation title ── */
     .card-title {
@@ -909,9 +908,7 @@ function renderCard(s, isPrimary, idx) {
           <span class="type-label">${esc(type)}</span>
           <span class="eyebrow-rule"></span>
           <span class="source-name">${esc(s.source)}</span>
-          <button class="btn-save" data-idx="${idx}" title="Save">
-            ${ICON_SAVE}
-          </button>
+          <button class="btn-save" data-idx="${idx}" title="Save"></button>
         </div>
         <div class="card-title-wrap"><p class="card-title">${esc(s.title)}</p></div>
       </div>

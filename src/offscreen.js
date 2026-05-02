@@ -101,12 +101,12 @@ async function runAI({ context, intent, contentTypeDesc, disciplineKey, discipli
     text = await session.prompt(
       `Lens: ${disciplineKey} — ${disciplineDesc}\n` +
       `Topic: "${context}". Intent: "${intent}". Angle: ${contentTypeDesc}\n\n` +
-      `3 surprising suggestions. For each, write a 'query': 4-6 search terms that would\n` +
-      `find this or similar analytical/in-depth content (avoid breaking-news phrasing).\n` +
+      `3 surprising suggestions. Articles are preferred but VIDEO or AUDIO are fine if they\n` +
+      `genuinely fit better. For each, write a 'query': 4-6 search terms to find it.\n` +
       `JSON only — no URLs:\n` +
-      `[{"title":"...","source":"...","type":"ARTICLE","query":"specific search terms"},` +
-      `{"title":"...","source":"...","type":"VIDEO","query":"specific search terms"},` +
-      `{"title":"...","source":"...","type":"AUDIO","query":"specific search terms"}]`,
+      `[{"title":"...","source":"...","type":"ARTICLE","query":"..."},` +
+      `{"title":"...","source":"...","type":"ARTICLE","query":"..."},` +
+      `{"title":"...","source":"...","type":"ARTICLE","query":"..."}]`,
     );
   } catch (e) {
     _sess = null;

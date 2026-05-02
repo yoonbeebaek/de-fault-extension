@@ -948,8 +948,7 @@ function renderCard(s, isPrimary, idx) {
     ? `<img class="card-thumb-img"
              src="${esc(s.image)}"
              alt=""
-             loading="${isPrimary ? 'eager' : 'lazy'}"
-             onerror="this.style.display='none';this.parentElement.querySelector('.card-thumb-icon').style.display='flex'">
+             loading="${isPrimary ? 'eager' : 'lazy'}">
        <div class="card-thumb-icon" style="display:none">${micon}</div>`
     : `<div class="card-thumb-icon">${micon}</div>`;
 
@@ -1050,6 +1049,17 @@ function mount(session) {
       </div>
     </div>
   `;
+
+  // Capture-phase error listener for broken thumbnails — onerror HTML attributes
+  // are blocked by host pages with strict CSP (no unsafe-inline).
+  shadow.addEventListener('error', e => {
+    const img = e.target;
+    if (img?.tagName === 'IMG' && img.classList.contains('card-thumb-img')) {
+      img.style.display = 'none';
+      const icon = img.closest('.card-thumb')?.querySelector('.card-thumb-icon');
+      if (icon) icon.style.display = 'flex';
+    }
+  }, true);
 
   const $ = (id) => shadow.getElementById(id);
 

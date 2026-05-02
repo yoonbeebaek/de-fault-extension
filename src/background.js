@@ -187,12 +187,13 @@ async function resolveUrl(s, disciplineKey, cardIndex, rawCard = false) {
   // Gemini writes an angle-aware query; fall back to title+source
   const baseQuery = s.query || [title, source].filter(Boolean).join(' ');
 
-  // VIDEO: try to find a specific YouTube video via Google News RSS first,
-  // then fall back to YouTube search results (multiple videos).
+  // VIDEO: search for real video links on known platforms via Google News RSS.
+  // Prefer /watch URLs; accept any hit. Falls back to Google search (not YouTube
+  // search results page, which always shows multiple unrelated videos).
   if (type === 'VIDEO') {
-    const videoHit = await rssFirstLink(`(${baseQuery}) site:youtube.com`);
-    if (videoHit && videoHit.includes('youtube.com/watch')) return videoHit;
-    return `https://www.youtube.com/results?search_query=${encodeURIComponent(baseQuery)}`;
+    const videoHit = await rssFirstLink(`(${baseQuery}) site:youtube.com OR site:vimeo.com OR site:ted.com`);
+    if (videoHit) return videoHit;
+    return `https://www.google.com/search?q=${encodeURIComponent(baseQuery + ' video')}`;
   }
 
   const isWildcard = cardIndex >= 2;

@@ -150,11 +150,13 @@ async function getThumb(s) {
 //                            positives (e.g. "essay contest" articles).
 //   Card 2 (wildcard)      — raw query only, no domain filter. Most serendipitous.
 
-// Discipline → preferred publications matching De.fault's editorial vibe
+// Discipline → preferred publications matching De.fault's editorial vibe.
+// Substack + Medium added to each discipline to surface essays and personal
+// writing that Google News RSS wouldn't otherwise index.
 const DISCIPLINE_DOMAINS = {
-  communicational: 'site:theatlantic.com OR site:newyorker.com OR site:lithub.com OR site:theguardian.com OR site:longreads.com',
-  economical:      'site:economist.com OR site:ft.com OR site:bloomberg.com OR site:hbr.org OR site:vox.com',
-  ecological:      'site:nature.com OR site:scientificamerican.com OR site:nationalgeographic.com OR site:newscientist.com OR site:wired.com',
+  communicational: 'site:theatlantic.com OR site:newyorker.com OR site:lithub.com OR site:theguardian.com OR site:longreads.com OR site:medium.com OR site:substack.com',
+  economical:      'site:economist.com OR site:ft.com OR site:bloomberg.com OR site:hbr.org OR site:vox.com OR site:medium.com OR site:substack.com',
+  ecological:      'site:nature.com OR site:scientificamerican.com OR site:nationalgeographic.com OR site:newscientist.com OR site:wired.com OR site:medium.com OR site:substack.com',
 };
 
 async function rssFirstLink(query) {

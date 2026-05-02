@@ -159,10 +159,13 @@ async function getThumb(s) {
 // Substack + Medium added to each discipline to surface essays and personal
 // writing that Google News RSS wouldn't otherwise index.
 const DISCIPLINE_DOMAINS = {
-  communicational: 'site:theatlantic.com OR site:newyorker.com OR site:lithub.com OR site:theguardian.com OR site:longreads.com OR site:medium.com OR site:substack.com',
-  economical:      'site:economist.com OR site:ft.com OR site:bloomberg.com OR site:hbr.org OR site:vox.com OR site:medium.com OR site:substack.com',
-  ecological:      'site:nature.com OR site:scientificamerican.com OR site:nationalgeographic.com OR site:newscientist.com OR site:wired.com OR site:medium.com OR site:substack.com',
+  communicational: 'site:theatlantic.com OR site:newyorker.com OR site:lithub.com OR site:theguardian.com OR site:longreads.com OR site:medium.com OR site:substack.com OR site:reddit.com',
+  economical:      'site:economist.com OR site:ft.com OR site:bloomberg.com OR site:hbr.org OR site:vox.com OR site:medium.com OR site:substack.com OR site:reddit.com',
+  ecological:      'site:nature.com OR site:scientificamerican.com OR site:nationalgeographic.com OR site:newscientist.com OR site:wired.com OR site:medium.com OR site:substack.com OR site:reddit.com',
 };
+
+// Raw POV card — sources with unfiltered community voice
+const RAW_DOMAINS = 'site:reddit.com OR site:x.com OR site:twitter.com';
 
 async function rssFirstLink(query) {
   const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
@@ -177,7 +180,7 @@ async function rssFirstLink(query) {
   } catch { return null; }
 }
 
-async function resolveUrl(s, disciplineKey, cardIndex) {
+async function resolveUrl(s, disciplineKey, cardIndex, rawCard = false) {
   const type      = (s.type || 'ARTICLE').toUpperCase();
   const title     = s.title  || '';
   const source    = s.source || '';
@@ -193,9 +196,17 @@ async function resolveUrl(s, disciplineKey, cardIndex) {
   }
 
   const isWildcard = cardIndex >= 2;
+  const isRawCard  = isWildcard && rawCard;
 
-  if (isWildcard) {
-    // Card 2: raw query, no editorial filter — most serendipitous result
+  if (isRawCard) {
+    // Raw POV card: Reddit/X community voice
+    const hit = await rssFirstLink(`(${baseQuery}) ${RAW_DOMAINS}`);
+    if (hit) return hit;
+    // fallback to unfiltered
+    const hit2 = await rssFirstLink(baseQuery);
+    if (hit2) return hit2;
+  } else if (isWildcard) {
+    // Normal wildcard: no editorial filter
     const hit = await rssFirstLink(baseQuery);
     if (hit) return hit;
   } else {
@@ -236,11 +247,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
         if (result.ok && Array.isArray(result.data)) {
           const disciplineKey = message.payload?.disciplineKey;
+          const rawCard       = !!message.payload?.rawCard;
           result.data = await Promise.all(
             result.data.map(async (s, i) => {
-              const url   = await resolveUrl(s, disciplineKey, i);
+              const isRaw = rawCard && i === 2;
+              const url   = await resolveUrl(s, disciplineKey, i, rawCard);
               const image = await getThumb({ ...s, url });
-              return { ...s, url, image };
+              return { ...s, url, image, ...(isRaw ? { raw: true } : {}) };
             })
           );
         }

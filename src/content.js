@@ -200,6 +200,16 @@ const contentCheckers = [
     }
   },
   {
+    type: 'social',
+    check(host, path) {
+      if ((host.includes('twitter.com') || host.includes('x.com')) && path.length > 2 && !path.startsWith('/home') && !path.startsWith('/explore')) return true;
+      if (host.includes('instagram.com') && /^\/(p|reel|tv)\//.test(path)) return true;
+      if (host.includes('tiktok.com') && /\/@.+\/video\//.test(path)) return true;
+      if (host.includes('threads.net') && /\/@.+\/post\//.test(path)) return true;
+      return false;
+    }
+  },
+  {
     type: 'article',
     check(host, path, url) {
       // Tier 1: JSON-LD @type
@@ -262,6 +272,30 @@ function getPageContext() {
     const el = document.querySelector('[data-testid="tweetText"]');
     if (el?.textContent.trim().length > 10)
       return { context: el.textContent.trim().slice(0, 200) };
+    // Fallback to og:title if tweet text not yet rendered
+    const og = document.querySelector('meta[property="og:title"]')?.content?.trim();
+    if (og?.length > 10) return { context: og.slice(0, 200) };
+  }
+
+  // Instagram posts/reels
+  if (host.includes('instagram.com')) {
+    const og = document.querySelector('meta[property="og:title"]')?.content?.trim();
+    // og:title format: "username on Instagram: 'caption text'"
+    const caption = og?.replace(/^.+?on Instagram:\s*["']?/i, '').replace(/["']$/, '').trim();
+    if (caption?.length >= 10) return { context: caption.slice(0, 200) };
+  }
+
+  // TikTok videos
+  if (host.includes('tiktok.com')) {
+    const og = document.querySelector('meta[property="og:title"]')?.content?.trim();
+    const clean = og?.replace(/\|\s*TikTok\s*$/i, '').trim();
+    if (clean?.length >= 8) return { context: clean.slice(0, 200) };
+  }
+
+  // Threads posts
+  if (host.includes('threads.net')) {
+    const og = document.querySelector('meta[property="og:description"], meta[name="description"]')?.content?.trim();
+    if (og?.length >= 10) return { context: og.slice(0, 200) };
   }
 
   // Reddit
@@ -342,7 +376,7 @@ function detectIntent(text) {
 
 // ─── Session state ─────────────────────────────────────────────
 
-const SK = { discipline: 'df-di', color: 'df-ci', angle: 'df-ai', hl: 'df-hl' };
+const SK = { discipline: 'df-di', color: 'df-ci', angle: 'df-ai', hl: 'df-hl', raw: 'df-raw' };
 
 function initSession(intent) {
   // Discipline — random per tab session, drives color palette
@@ -376,7 +410,15 @@ function initSession(intent) {
     hl = pickHeadline(angle.key);
     sessionStorage.setItem(SK.hl, hl);
   }
-  return { discipline, color, angle, angleIdx: +ai, headline: hl };
+
+  // Raw POV card — 15% chance per session; card 2 becomes a Reddit/social source
+  let rawCard = sessionStorage.getItem(SK.raw);
+  if (rawCard === null) {
+    rawCard = Math.random() < 0.15 ? '1' : '0';
+    sessionStorage.setItem(SK.raw, rawCard);
+  }
+
+  return { discipline, color, angle, angleIdx: +ai, headline: hl, rawCard: rawCard === '1' };
 }
 
 function rotateAngle(intent, currentIdx) {
@@ -712,10 +754,22 @@ function buildStyles(color) {
     .type-label {
       font-weight: 600;
       font-size: 10px;
-      color: rgba(255,255,255,0.70);   /* --fg-3 */
+      color: rgba(255,255,255,0.70);
       letter-spacing: 0.02em;
       text-transform: uppercase;
       white-space: nowrap;
+    }
+    .raw-badge {
+      font-weight: 700;
+      font-size: 9px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      color: #ff5c3a;
+      border: 1px solid rgba(255,92,58,0.60);
+      border-radius: 3px;
+      padding: 1px 5px;
+      line-height: 1.4;
     }
 
     /* 1px × 8px vertical rule — spec: background: var(--fg-rule) */
@@ -905,7 +959,9 @@ function renderCard(s, isPrimary, idx) {
       <div class="card-body">
         <div class="eyebrow">
           <span class="medium-icon">${micon}</span>
-          <span class="type-label">${esc(type)}</span>
+          ${s.raw
+            ? `<span class="raw-badge">Raw POV</span>`
+            : `<span class="type-label">${esc(type)}</span>`}
           <span class="eyebrow-rule"></span>
           <span class="source-name">${esc(s.source)}</span>
           <button class="btn-save" data-idx="${idx}" title="Save"></button>
@@ -1096,7 +1152,8 @@ function fetchPayload() {
     intent:          appState.intent,
     contentTypeDesc: appState.angle.desc,
     disciplineKey:   appState.discipline.key,
-    disciplineDesc:  appState.discipline.desc
+    disciplineDesc:  appState.discipline.desc,
+    rawCard:         appState.rawCard,
   };
 }
 
@@ -1155,7 +1212,8 @@ async function boot() {
     angle:      session.angle,
     angleIdx:   session.angleIdx,
     discipline: session.discipline,
-    color:      session.color
+    color:      session.color,
+    rawCard:    session.rawCard,
   };
 
   const key = cacheKey();

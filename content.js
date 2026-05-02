@@ -811,17 +811,21 @@ function handleCardsClick(e) {
 
 async function loadSuggestions() {
   setCards(renderLoading());
-  const resp = await chrome.runtime.sendMessage({
-    type: 'FETCH_SUGGESTIONS',
-    payload: {
-      context:        appState.context,
-      intent:         appState.intent,
-      contentTypeDesc: appState.angle.desc,
-      disciplineKey:  appState.discipline.key,
-      disciplineDesc: appState.discipline.desc
-    }
-  });
-  setCards(resp.ok ? renderSuggestions(resp.data) : renderError(resp.error));
+  try {
+    const resp = await chrome.runtime.sendMessage({
+      type: 'FETCH_SUGGESTIONS',
+      payload: {
+        context:         appState.context,
+        intent:          appState.intent,
+        contentTypeDesc: appState.angle.desc,
+        disciplineKey:   appState.discipline.key,
+        disciplineDesc:  appState.discipline.desc
+      }
+    });
+    setCards(resp.ok ? renderSuggestions(resp.data) : renderError(resp.error));
+  } catch (err) {
+    setCards(renderError(err.message || 'Could not reach background service. Try reloading the page.'));
+  }
 }
 
 // ─── Context relevance gate ────────────────────────────────────
@@ -840,7 +844,9 @@ const TRIGGER_DOMAINS = [
 ];
 
 function isContextTriggerable(context, intent) {
-  if (!context || context.length < 12) return false;
+  if (!context || context.length < 5) return false;
+  // Google Search always qualifies — the query IS the intent signal
+  if (/google\.[a-z.]+\/search/.test(window.location.href)) return true;
   if (intent === "I'm open to discovery") {
     const host = window.location.hostname;
     return TRIGGER_DOMAINS.some(d => host.includes(d));

@@ -429,29 +429,12 @@ const SOURCE_DOMAINS = {
   'wikipedia': 'wikipedia.org', 'reddit': 'reddit.com',
 };
 
+// URL is resolved by background.js (Google News RSS or YouTube search).
+// s.url is always set and reliable by the time it reaches here.
+// This function is a last-resort safety net only.
 function cardUrl(s) {
-  const type = (s.type || 'ARTICLE').toUpperCase();
-  const title = s.title || '';
-  const source = s.source || '';
-
-  // 1. Use AI-provided URL if it's a real link (not the template placeholder)
-  if (s.url && /^https?:\/\/[a-z0-9][-a-z0-9.]{2,}\.[a-z]{2,}(\/\S+)/i.test(s.url)) {
-    return s.url;
-  }
-
-  // 2. Site-specific search: shows results only from the source publication
-  const domain = SOURCE_DOMAINS[(source).toLowerCase().trim()];
-  const titleEnc = encodeURIComponent(title);
-  if (type === 'VIDEO') {
-    return `https://www.youtube.com/results?search_query=${encodeURIComponent(title + ' ' + source)}`;
-  }
-  if (domain) {
-    return `https://www.google.com/search?q=site:${domain}+${titleEnc}`;
-  }
-
-  // 3. Generic Google search as last resort
-  const q = encodeURIComponent(title + ' ' + source);
-  if (type === 'AUDIO') return `https://www.google.com/search?q=${q}+podcast`;
+  if (s.url) return s.url;
+  const q = encodeURIComponent([s.title, s.source].filter(Boolean).join(' '));
   return `https://www.google.com/search?q=${q}`;
 }
 

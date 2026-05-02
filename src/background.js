@@ -139,6 +139,49 @@ async function getThumb(s) {
   return null;
 }
 
+// ─── URL resolution via Google News RSS ───────────────────────
+// Gemini Nano hallucinates URLs — instead we ask it for title+source only
+// and look up real live URLs ourselves via Google News RSS (free, no key).
+
+async function fetchGoogleNewsUrl(query) {
+  const rssUrl =
+    `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
+  try {
+    const resp = await timedFetch(rssUrl, 7000);
+    if (!resp.ok) return null;
+    const xml = await resp.text();
+    // Locate first <item> and pull its <link> (Google News redirect → real article)
+    const itemStart = xml.indexOf('<item>');
+    if (itemStart === -1) return null;
+    const m = xml.slice(itemStart).match(/<link>(https?:\/\/[^<\s]+)/i);
+    return m?.[1]?.trim() || null;
+  } catch { return null; }
+}
+
+async function resolveUrl(s) {
+  const type   = (s.type || 'ARTICLE').toUpperCase();
+  const title  = s.title  || '';
+  const source = s.source || '';
+  const query  = [title, source].filter(Boolean).join(' ');
+
+  // VIDEO: YouTube search always works, never 404s
+  if (type === 'VIDEO') {
+    return `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+  }
+
+  // ARTICLE / AUDIO: try Google News RSS first
+  const newsUrl = await fetchGoogleNewsUrl(query);
+  if (newsUrl) return newsUrl;
+
+  // Fallback: site-specific Google search or generic search
+  const domain = SOURCE_DOMAINS[(source).toLowerCase().trim()];
+  const titleEnc = encodeURIComponent(title);
+  if (domain) return `https://www.google.com/search?q=site:${domain}+${titleEnc}`;
+  const q = encodeURIComponent(query);
+  if (type === 'AUDIO') return `https://www.google.com/search?q=${q}+podcast`;
+  return `https://www.google.com/search?q=${q}`;
+}
+
 // ─── Message handler ───────────────────────────────────────────
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'FETCH_SUGGESTIONS') {
@@ -156,7 +199,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
         if (result.ok && Array.isArray(result.data)) {
           result.data = await Promise.all(
-            result.data.map(async s => ({ ...s, image: await getThumb(s) }))
+            result.data.map(async s => {
+              const url   = await resolveUrl(s);
+              const image = await getThumb({ ...s, url });
+              return { ...s, url, image };
+            })
           );
         }
         sendResponse(result);

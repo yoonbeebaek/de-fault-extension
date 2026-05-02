@@ -119,8 +119,13 @@ async function getWikipediaImage(title) {
 // 2. Wikipedia image for the topic (free, topic-relevant, high quality)
 // 3. Source homepage og:image (brand logo — last resort)
 async function getThumb(s) {
-  const fromArticle = await fetchOgImage(s.url);
-  if (fromArticle) return fromArticle;
+  // YouTube search/results URLs have no useful og:image (returns logo only).
+  // Skip straight to Wikipedia for video cards.
+  const isSearchPage = /\/(results|search)\?/i.test(s.url || '');
+  if (!isSearchPage) {
+    const fromArticle = await fetchOgImage(s.url);
+    if (fromArticle) return fromArticle;
+  }
 
   const fromWiki = await getWikipediaImage(s.title);
   if (fromWiki) return fromWiki;

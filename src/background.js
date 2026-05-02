@@ -140,17 +140,30 @@ async function getThumb(s) {
 }
 
 // ─── URL resolution via Google News RSS ───────────────────────
-// Gemini Nano hallucinates URLs — instead we ask it for title+source only
-// and look up real live URLs ourselves via Google News RSS (free, no key).
+// Gemini Nano hallucinates URLs — instead we ask it for title+source+query,
+// then look up real live URLs via Google News RSS (free, no key).
+//
+// Two-stage RSS strategy (stops after first hit):
+//   Stage 1: discipline-curated domains  →  De.fault-quality sources preferred
+//   Stage 2: depth-modified general search  →  bias toward essays/analysis
+//   Fallback: Google site:domain search or generic Google search
 
-async function fetchGoogleNewsUrl(query) {
-  const rssUrl =
-    `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
+// Discipline → preferred publications that match De.fault's editorial vibe
+const DISCIPLINE_DOMAINS = {
+  communicational: 'site:theatlantic.com OR site:newyorker.com OR site:lithub.com OR site:theguardian.com OR site:longreads.com',
+  economical:      'site:economist.com OR site:ft.com OR site:bloomberg.com OR site:hbr.org OR site:vox.com',
+  ecological:      'site:nature.com OR site:scientificamerican.com OR site:nationalgeographic.com OR site:newscientist.com OR site:wired.com',
+};
+
+// Added to stage-2 query to push results toward analytical/long-form over breaking news
+const DEPTH_MODIFIER = 'analysis OR essay OR in-depth OR explained OR research';
+
+async function rssFirstLink(query) {
+  const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
   try {
-    const resp = await timedFetch(rssUrl, 7000);
+    const resp = await timedFetch(url, 6000);
     if (!resp.ok) return null;
     const xml = await resp.text();
-    // Locate first <item> and pull its <link> (Google News redirect → real article)
     const itemStart = xml.indexOf('<item>');
     if (itemStart === -1) return null;
     const m = xml.slice(itemStart).match(/<link>(https?:\/\/[^<\s]+)/i);
@@ -158,26 +171,34 @@ async function fetchGoogleNewsUrl(query) {
   } catch { return null; }
 }
 
-async function resolveUrl(s) {
+async function resolveUrl(s, disciplineKey) {
   const type   = (s.type || 'ARTICLE').toUpperCase();
   const title  = s.title  || '';
   const source = s.source || '';
-  const query  = [title, source].filter(Boolean).join(' ');
+  // Prefer Gemini's optimized query; fall back to raw title+source
+  const baseQuery = s.query || [title, source].filter(Boolean).join(' ');
 
-  // VIDEO: YouTube search always works, never 404s
+  // VIDEO: YouTube search never 404s — no RSS needed
   if (type === 'VIDEO') {
-    return `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+    return `https://www.youtube.com/results?search_query=${encodeURIComponent(baseQuery)}`;
   }
 
-  // ARTICLE / AUDIO: try Google News RSS first
-  const newsUrl = await fetchGoogleNewsUrl(query);
-  if (newsUrl) return newsUrl;
+  // Stage 1: discipline-curated domain filter
+  const domainFilter = DISCIPLINE_DOMAINS[disciplineKey];
+  if (domainFilter) {
+    const hit = await rssFirstLink(`(${baseQuery}) ${domainFilter}`);
+    if (hit) return hit;
+  }
 
-  // Fallback: site-specific Google search or generic search
+  // Stage 2: depth-modified general search (essays/analysis over breaking news)
+  const hit2 = await rssFirstLink(`${baseQuery} ${DEPTH_MODIFIER}`);
+  if (hit2) return hit2;
+
+  // Fallback: Google search (site-specific if source is known, generic otherwise)
   const domain = SOURCE_DOMAINS[(source).toLowerCase().trim()];
   const titleEnc = encodeURIComponent(title);
   if (domain) return `https://www.google.com/search?q=site:${domain}+${titleEnc}`;
-  const q = encodeURIComponent(query);
+  const q = encodeURIComponent(baseQuery);
   if (type === 'AUDIO') return `https://www.google.com/search?q=${q}+podcast`;
   return `https://www.google.com/search?q=${q}`;
 }
@@ -198,9 +219,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           return;
         }
         if (result.ok && Array.isArray(result.data)) {
+          const disciplineKey = message.payload?.disciplineKey;
           result.data = await Promise.all(
             result.data.map(async s => {
-              const url   = await resolveUrl(s);
+              const url   = await resolveUrl(s, disciplineKey);
               const image = await getThumb({ ...s, url });
               return { ...s, url, image };
             })

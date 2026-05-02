@@ -988,8 +988,7 @@ function mount(session) {
         <div class="cards" id="cards">${renderLoading()}</div>
         <div class="footer">
           <a class="feedback-link"
-             href="https://github.com/yoonbeebaek/de-fault-extension/issues"
-             target="_blank" rel="noopener noreferrer">Send Feedback</a>
+             href="mailto:yoonbeebaek@gmail.com?subject=De.fault%20Feedback">Send Feedback</a>
           <span class="copyright">2026 de.fault all rights reserved</span>
         </div>
       </div>

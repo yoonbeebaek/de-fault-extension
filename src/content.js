@@ -7,14 +7,14 @@
 // ─── Copy ──────────────────────────────────────────────────────
 
 const ANGLE_HEADLINES = {
-  cause:       ["Understanding why can also help.", "Everything traces back to something."],
+  cause:       ["Understanding why can also help.", "Where this actually stems from"],
   effect:      ["Here's what this sets in motion.", "The ripple you didn't see coming."],
   backstory:   ["Check out the backstory!", "This started somewhere unexpected."],
-  opinion:     ["Not everyone agrees on this.", "The debate hiding in plain sight."],
+  opinion:     ["Not everyone agrees on this.", "The debate hiding in plain sight.", "Voices from the other side"],
   adjacent:    ["Hey, have you heard about this?", "Something unexpected lives right next door."],
-  alternative: ["Shall we explore different perspectives?", "There's a completely different way to see this."],
+  alternative: ["Shall we explore different perspectives?", "We could look at this differently"],
   contributor: ["More pieces of this puzzle.", "You might be surprised what played a part."],
-  examples:    ["I have something else to show you!", "Real cases that change the picture."],
+  examples:    ["What this looks like in the wild", "Real cases that change the picture."],
 };
 
 function pickHeadline(angleKey) {

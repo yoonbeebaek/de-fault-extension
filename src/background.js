@@ -140,28 +140,27 @@ async function getThumb(s) {
 }
 
 // ─── URL resolution via Google News RSS ───────────────────────
-// Gemini Nano hallucinates URLs — instead we ask it for title+source+query,
-// then look up real live URLs via Google News RSS (free, no key).
+// Gemini Nano hallucinates URLs — instead we use title+source+query from
+// Gemini to look up real live URLs via Google News RSS (free, no key).
 //
-// Two-stage RSS strategy (stops after first hit):
-//   Stage 1: discipline-curated domains  →  De.fault-quality sources preferred
-//   Stage 2: depth-modified general search  →  bias toward essays/analysis
-//   Fallback: Google site:domain search or generic Google search
+// Card slot strategy:
+//   Cards 0 & 1 (curated)  — domain-filtered + general queries run IN PARALLEL;
+//                            first hit wins. No format-descriptor keywords
+//                            (essay, in-depth) — those cause literal-match false
+//                            positives (e.g. "essay contest" articles).
+//   Card 2 (wildcard)      — raw query only, no domain filter. Most serendipitous.
 
-// Discipline → preferred publications that match De.fault's editorial vibe
+// Discipline → preferred publications matching De.fault's editorial vibe
 const DISCIPLINE_DOMAINS = {
   communicational: 'site:theatlantic.com OR site:newyorker.com OR site:lithub.com OR site:theguardian.com OR site:longreads.com',
   economical:      'site:economist.com OR site:ft.com OR site:bloomberg.com OR site:hbr.org OR site:vox.com',
   ecological:      'site:nature.com OR site:scientificamerican.com OR site:nationalgeographic.com OR site:newscientist.com OR site:wired.com',
 };
 
-// Added to stage-2 query to push results toward analytical/long-form over breaking news
-const DEPTH_MODIFIER = 'analysis OR essay OR in-depth OR explained OR research';
-
 async function rssFirstLink(query) {
   const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
   try {
-    const resp = await timedFetch(url, 6000);
+    const resp = await timedFetch(url, 5000);
     if (!resp.ok) return null;
     const xml = await resp.text();
     const itemStart = xml.indexOf('<item>');
@@ -171,30 +170,37 @@ async function rssFirstLink(query) {
   } catch { return null; }
 }
 
-async function resolveUrl(s, disciplineKey) {
-  const type   = (s.type || 'ARTICLE').toUpperCase();
-  const title  = s.title  || '';
-  const source = s.source || '';
-  // Prefer Gemini's optimized query; fall back to raw title+source
+async function resolveUrl(s, disciplineKey, cardIndex) {
+  const type      = (s.type || 'ARTICLE').toUpperCase();
+  const title     = s.title  || '';
+  const source    = s.source || '';
+  // Gemini writes an angle-aware query; fall back to title+source
   const baseQuery = s.query || [title, source].filter(Boolean).join(' ');
 
-  // VIDEO: YouTube search never 404s — no RSS needed
+  // VIDEO: YouTube search never 404s
   if (type === 'VIDEO') {
     return `https://www.youtube.com/results?search_query=${encodeURIComponent(baseQuery)}`;
   }
 
-  // Stage 1: discipline-curated domain filter
-  const domainFilter = DISCIPLINE_DOMAINS[disciplineKey];
-  if (domainFilter) {
-    const hit = await rssFirstLink(`(${baseQuery}) ${domainFilter}`);
+  const isWildcard = cardIndex >= 2;
+
+  if (isWildcard) {
+    // Card 2: raw query, no editorial filter — most serendipitous result
+    const hit = await rssFirstLink(baseQuery);
+    if (hit) return hit;
+  } else {
+    // Cards 0 & 1: domain-filtered and general queries run IN PARALLEL;
+    // whichever returns first wins — halves sequential latency.
+    const domainFilter = DISCIPLINE_DOMAINS[disciplineKey];
+    const [hit1, hit2] = await Promise.all([
+      domainFilter ? rssFirstLink(`(${baseQuery}) ${domainFilter}`) : Promise.resolve(null),
+      rssFirstLink(baseQuery),
+    ]);
+    const hit = hit1 || hit2;
     if (hit) return hit;
   }
 
-  // Stage 2: depth-modified general search (essays/analysis over breaking news)
-  const hit2 = await rssFirstLink(`${baseQuery} ${DEPTH_MODIFIER}`);
-  if (hit2) return hit2;
-
-  // Fallback: Google search (site-specific if source is known, generic otherwise)
+  // Fallback: site-specific Google search → generic Google search
   const domain = SOURCE_DOMAINS[(source).toLowerCase().trim()];
   const titleEnc = encodeURIComponent(title);
   if (domain) return `https://www.google.com/search?q=site:${domain}+${titleEnc}`;
@@ -221,8 +227,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (result.ok && Array.isArray(result.data)) {
           const disciplineKey = message.payload?.disciplineKey;
           result.data = await Promise.all(
-            result.data.map(async s => {
-              const url   = await resolveUrl(s, disciplineKey);
+            result.data.map(async (s, i) => {
+              const url   = await resolveUrl(s, disciplineKey, i);
               const image = await getThumb({ ...s, url });
               return { ...s, url, image };
             })

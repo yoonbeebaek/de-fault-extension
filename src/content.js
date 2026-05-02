@@ -864,13 +864,13 @@ function buildStyles(color) {
       padding: 0;
       cursor: pointer;
       opacity: 1;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.30);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.15);
       border-radius: 50%;
       transition: transform 140ms ease, box-shadow 140ms ease;
     }
     .df-fab:hover {
       transform: scale(1.08);
-      box-shadow: 0 4px 18px rgba(0,0,0,0.40);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.22);
     }
     .df-fab:active { transform: scale(0.95); }
     @keyframes df-fab-in {
@@ -946,6 +946,15 @@ function renderSuggestions(data) {
 
 let host = null, shadow = null, appState = {};
 let inactiveHost = null;
+let _dfActive = false; // true only when active FAB is mounted
+
+// Let the popup know whether De.fault actually activated on this page
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg.type === 'DF_GET_STATUS') {
+    sendResponse({ active: _dfActive });
+    return false;
+  }
+});
 
 function mountInactiveFAB() {
   if (inactiveHost || host) return;
@@ -961,7 +970,7 @@ function mountInactiveFAB() {
         background: url("${ext}Floating_inactivated.png") no-repeat center / 44px 44px;
         border:none; padding:0; display:block; cursor:default;
         opacity: 1;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.30);
+        box-shadow: 0 1px 4px rgba(0,0,0,0.15);
         border-radius: 50%;
       }
     </style>
@@ -973,6 +982,7 @@ function mountInactiveFAB() {
 function mount(session) {
   if (host) return;
   if (inactiveHost) { inactiveHost.remove(); inactiveHost = null; }
+  _dfActive = true;
 
   host = document.createElement('div');
   host.id = 'de-fault-root';

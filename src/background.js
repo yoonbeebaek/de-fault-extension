@@ -110,10 +110,11 @@ const WIKI_STOP = new Set([
 ]);
 
 async function getWikipediaImage(title) {
-  const terms = (title || '')
+  const words = (title || '')
     .toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
-    .filter(w => w.length > 3 && !WIKI_STOP.has(w))
-    .slice(0, 3).join(' ');
+    .filter(w => w.length > 3 && !WIKI_STOP.has(w));
+  // 2 keywords hit Wikipedia more reliably than 3 — narrower combos often miss
+  const terms = words.slice(0, 2).join(' ');
   if (!terms) return null;
 
   try {
@@ -142,10 +143,12 @@ async function getWikipediaImage(title) {
 // 2. Wikipedia image for the topic (free, topic-relevant, high quality)
 // 3. Source homepage og:image (brand logo — last resort)
 async function getThumb(s) {
-  // Skip og:image for search/results pages — they return site logos, not article images.
-  // Google News redirect URLs are followed transparently by fetch() so they work fine.
-  const isSearchPage = /\/(results|search)\?/i.test(s.url || '');
-  if (!isSearchPage) {
+  // Skip og:image fetch for URLs that can't yield the real article image:
+  // Google News RSS URLs (news.google.com/rss/...) don't redirect to the article
+  // in service worker context — fetch() gets the Google News page and its logo.
+  const skipOg = /\/(results|search)\?/i.test(s.url || '')
+               || /news\.google\.com/i.test(s.url || '');
+  if (!skipOg) {
     const fromArticle = await fetchOgImage(s.url);
     if (fromArticle) return fromArticle;
   }

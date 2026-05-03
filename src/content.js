@@ -52,13 +52,13 @@ const UNDER_ANGLES = [
   { key: 'cause',     desc: 'surprising origin story — what unexpected forces, decisions, or hidden history caused this to exist? Focus on the counterintuitive and delightful.' },
   { key: 'effect',    desc: 'fascinating downstream effects — what surprising or hopeful things happen because of this? Look for the counterintuitive and positive.' },
   { key: 'opinion',   desc: 'the most interesting intellectual debate around this — a perspective that reframes everything and makes you think "I never considered that"' },
-  { key: 'backstory', desc: 'compelling backstory — the fascinating, surprising historical or personal origin that most people don\'t know' },
+  { key: 'backstory', desc: 'the timeline behind this — how did it evolve step by step? Surface the turning points, forgotten chapters, and historical moments that shaped what it is today.' },
 ];
 
 const AROUND_ANGLES = [
   { key: 'adjacent',    desc: 'delightfully adjacent topics — what surprising field or concept shares deep hidden similarities with this? Prioritize the unexpected and wondrous.' },
   { key: 'alternative', desc: 'a completely different and more interesting frame for this topic — something that recontextualizes everything in a satisfying way' },
-  { key: 'contributor', desc: 'unexpected contributors — what surprising, little-known forces or people helped make this what it is today?' },
+  { key: 'contributor', desc: 'the systemic and environmental forces behind this — what structural, economic, or cultural systems quietly shaped this into what it is? Think infrastructure, incentives, institutions.' },
   { key: 'examples',    desc: 'the most surprising and counterintuitive real-world examples — cases that make you go "I had no idea!" about this topic' },
 ];
 

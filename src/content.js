@@ -989,9 +989,10 @@ function renderCard(s, isPrimary, idx) {
 }
 
 function renderSuggestions(data) {
+  if (!Array.isArray(data) || !data[0]) return renderError('No suggestions returned.');
   return renderCard(data[0], true, 0)
-    + renderCard(data[1], false, 1)
-    + renderCard(data[2], false, 2);
+    + (data[1] ? renderCard(data[1], false, 1) : '')
+    + (data[2] ? renderCard(data[2], false, 2) : '');
 }
 
 // ─── Overlay ───────────────────────────────────────────────────

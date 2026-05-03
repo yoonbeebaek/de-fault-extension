@@ -145,31 +145,44 @@ async function getWikipediaImage(title) {
 //
 // Skipped for Google News redirect URLs (service worker fetch lands on
 // the GNews page, not the article) and Google/YouTube search result pages.
-async function fetchPageMeta(url) {
+// fallbackTitle = Gemini's suggestion title, used for Wikipedia search when
+// the resolved URL can't provide an og:image directly.
+async function fetchPageMeta(url, fallbackTitle = '') {
   if (!url) return { title: null, image: null };
-  const isSkipped = /news\.google\.com/i.test(url)
-                 || /google\.com\/search/i.test(url)
-                 || /youtube\.com\/(results|search)/i.test(url);
-  if (isSkipped) return { title: null, image: null };
 
-  try {
-    const resp = await timedFetch(url, 7000);
-    if (!resp.ok) return { title: null, image: null };
-    const html  = await resp.text();
-    const base  = resp.url || url;
+  const isGoogleUrl = /news\.google\.com/i.test(url)
+                   || /google\.com\/search/i.test(url)
+                   || /youtube\.com\/(results|search)/i.test(url);
 
-    const image = extractOgImage(html, base);
+  let title = null;
+  let image = null;
 
-    // og:title preferred; fall back to <title> tag
-    const ogM  = html.match(/property=["']og:title["'][^>]*content=["']([^"']{5,200})["']/i)
-              || html.match(/content=["']([^"']{5,200})["'][^>]*property=["']og:title["']/i);
-    const tagM = html.match(/<title[^>]*>([^<]{5,200})<\/title>/i);
-    let title  = (ogM?.[1] || tagM?.[1] || '').trim();
-    // Strip trailing site-name suffix ("Article – Site Name" → "Article")
-    title = title.replace(/\s*[-–—|·•]\s*.{1,80}$/, '').trim();
+  // A: direct article URL — fetch the real page for title + og:image
+  if (!isGoogleUrl) {
+    try {
+      const resp = await timedFetch(url, 7000);
+      if (resp.ok) {
+        const html = await resp.text();
+        const base = resp.url || url;
+        image = extractOgImage(html, base);
+        const ogM  = html.match(/property=["']og:title["'][^>]*content=["']([^"']{5,200})["']/i)
+                  || html.match(/content=["']([^"']{5,200})["'][^>]*property=["']og:title["']/i);
+        const tagM = html.match(/<title[^>]*>([^<]{5,200})<\/title>/i);
+        let t = (ogM?.[1] || tagM?.[1] || '').trim();
+        title = t.replace(/\s*[-–—|·•]\s*.{1,80}$/, '').trim() || null;
+      }
+    } catch {}
+  }
 
-    return { title: title || null, image };
-  } catch { return { title: null, image: null }; }
+  // B/C: no og:image yet (Google News redirect, Google search, or page had none)
+  //      → try Wikipedia with Gemini's suggestion title as search query
+  if (!image && fallbackTitle) {
+    image = await getWikipediaImage(fallbackTitle);
+  }
+
+  // D: if Wikipedia also fails → image stays null → card shows type icon
+
+  return { title, image };
 }
 
 // ─── URL resolution via Google News RSS ───────────────────────
@@ -288,7 +301,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               const url   = await resolveUrl(s, disciplineKey, i, rawCard);
               // Single fetch: real page title + og:image from the resolved URL.
               // Title overrides Gemini's invented title so card matches the link.
-              const { title: realTitle, image } = await fetchPageMeta(url);
+              const { title: realTitle, image } = await fetchPageMeta(url, s.title);
               return {
                 ...s,
                 url,

@@ -106,9 +106,11 @@ async function runAI({ context, intent, contentTypeDesc, disciplineKey, discipli
     text = await session.prompt(
       `Lens: ${disciplineKey} — ${disciplineDesc}\n` +
       `Topic: "${context}". Intent: "${intent}". Angle: ${contentTypeDesc}\n\n` +
-      `3 surprising suggestions. Articles are preferred but VIDEO or AUDIO are fine if they\n` +
-      `genuinely fit better. For each, write a 'query': 4-6 search terms to find it.\n` +
-      `JSON only — no URLs:\n` +
+      `Give 3 surprising, real suggestions a curious person would want to read.\n` +
+      `Articles preferred; VIDEO or AUDIO only if clearly better.\n` +
+      `'query' = 4-6 plain search terms a journalist would type to find this — ` +
+      `no quotes, no site:, no invented phrases. Must match real published content.\n` +
+      `JSON only — no markdown, no URLs:\n` +
       `[{"title":"...","source":"...","type":"ARTICLE","query":"..."},` +
       `{"title":"...","source":"...","type":"ARTICLE","query":"..."},` +
       `{"title":"...","source":"...","type":"ARTICLE","query":"..."}]`,

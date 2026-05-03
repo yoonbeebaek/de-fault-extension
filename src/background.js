@@ -207,8 +207,10 @@ async function resolveUrl(s, disciplineKey, cardIndex, rawCard = false) {
   const type      = (s.type || 'ARTICLE').toUpperCase();
   const title     = s.title  || '';
   const source    = s.source || '';
-  // Gemini writes an angle-aware query; fall back to title+source
-  const baseQuery = s.query || [title, source].filter(Boolean).join(' ');
+  // Prefer Gemini's focused query field (4-6 terms) — if absent, use first
+  // 5 words of title + source so the fallback search stays broad enough to hit real articles.
+  const baseQuery = s.query
+    || [title.split(/\s+/).slice(0, 5).join(' '), source].filter(Boolean).join(' ');
 
   // VIDEO: search for real video links on known platforms via Google News RSS.
   // Prefer /watch URLs; accept any hit. Falls back to Google search (not YouTube
@@ -246,12 +248,13 @@ async function resolveUrl(s, disciplineKey, cardIndex, rawCard = false) {
   }
 
   // Fallback: site-specific Google search → generic Google search
+  // Use baseQuery (Gemini's search terms) not the title — the title may be
+  // a creative description that doesn't match any real article headline.
   const domain = SOURCE_DOMAINS[(source).toLowerCase().trim()];
-  const titleEnc = encodeURIComponent(title);
-  if (domain) return `https://www.google.com/search?q=site:${domain}+${titleEnc}`;
-  const q = encodeURIComponent(baseQuery);
-  if (type === 'AUDIO') return `https://www.google.com/search?q=${q}+podcast`;
-  return `https://www.google.com/search?q=${q}`;
+  const qEnc = encodeURIComponent(baseQuery);
+  if (domain) return `https://www.google.com/search?q=site:${domain}+${qEnc}`;
+  if (type === 'AUDIO') return `https://www.google.com/search?q=${qEnc}+podcast`;
+  return `https://www.google.com/search?q=${qEnc}`;
 }
 
 // ─── Message handler ───────────────────────────────────────────

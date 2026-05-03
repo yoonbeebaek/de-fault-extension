@@ -42,6 +42,27 @@ const SOURCE_DOMAINS = {
   'hbr': 'hbr.org', 'harvard business review': 'hbr.org',
   'mit technology review': 'technologyreview.com',
   'ars technica': 'arstechnica.com', 'quartz': 'qz.com',
+  // Independent agencies, institutes & niche publishers
+  'e-flux': 'e-flux.com',
+  'adweek': 'adweek.com',
+  'print magazine': 'printmag.com', 'print mag': 'printmag.com',
+  'design observer': 'designobserver.com',
+  '2x4': '2x4.org', '2×4': '2x4.org',
+  'pentagram': 'pentagram.com',
+  'base design': 'basedesign.com',
+  'work & co': 'work.co', 'work and co': 'work.co',
+  'long now': 'longnow.org', 'long now foundation': 'longnow.org',
+  'data & society': 'datasociety.net', 'data and society': 'datasociety.net',
+  'strelka': 'strelka.com', 'strelka magazine': 'strelka.com',
+  'forensic architecture': 'forensic-architecture.org',
+  'business of fashion': 'businessoffashion.com', 'bof': 'businessoffashion.com',
+  'ribbonfarm': 'ribbonfarm.com',
+  'interintellect': 'interintellect.com',
+  'lithub': 'lithub.com', 'lit hub': 'lithub.com',
+  'longreads': 'longreads.com',
+  'aeon': 'aeon.co',
+  'noema': 'noemamag.com', 'noema magazine': 'noemamag.com',
+  'ssense': 'ssense.com',
 };
 
 // ─── Helpers ───────────────────────────────────────────────────
@@ -159,9 +180,9 @@ async function getThumb(s) {
 // Substack + Medium added to each discipline to surface essays and personal
 // writing that Google News RSS wouldn't otherwise index.
 const DISCIPLINE_DOMAINS = {
-  communicational: 'site:theatlantic.com OR site:newyorker.com OR site:lithub.com OR site:theguardian.com OR site:longreads.com OR site:medium.com OR site:substack.com OR site:reddit.com',
-  economical:      'site:economist.com OR site:ft.com OR site:bloomberg.com OR site:hbr.org OR site:vox.com OR site:medium.com OR site:substack.com OR site:reddit.com',
-  ecological:      'site:nature.com OR site:scientificamerican.com OR site:nationalgeographic.com OR site:newscientist.com OR site:wired.com OR site:medium.com OR site:substack.com OR site:reddit.com',
+  communicational: 'site:theatlantic.com OR site:newyorker.com OR site:lithub.com OR site:theguardian.com OR site:longreads.com OR site:e-flux.com OR site:designobserver.com OR site:printmag.com OR site:aeon.co OR site:noemamag.com OR site:ribbonfarm.com OR site:interintellect.com OR site:medium.com OR site:substack.com OR site:reddit.com',
+  economical:      'site:economist.com OR site:ft.com OR site:bloomberg.com OR site:hbr.org OR site:vox.com OR site:businessoffashion.com OR site:datasociety.net OR site:ribbonfarm.com OR site:adweek.com OR site:medium.com OR site:substack.com OR site:reddit.com',
+  ecological:      'site:nature.com OR site:scientificamerican.com OR site:nationalgeographic.com OR site:newscientist.com OR site:wired.com OR site:longnow.org OR site:datasociety.net OR site:forensic-architecture.org OR site:noemamag.com OR site:aeon.co OR site:medium.com OR site:substack.com OR site:reddit.com',
 };
 
 // Raw POV card — sources with unfiltered community voice

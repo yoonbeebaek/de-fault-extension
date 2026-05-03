@@ -428,10 +428,10 @@ function initSession(intent) {
     sessionStorage.setItem(SK.hl, hl);
   }
 
-  // Raw POV card — 15% chance per session; card 2 becomes a Reddit/social source
+  // Raw POV card — 40% chance per session; card 2 pulls from Reddit/X/social sources
   let rawCard = sessionStorage.getItem(SK.raw);
   if (rawCard === null) {
-    rawCard = Math.random() < 0.15 ? '1' : '0';
+    rawCard = Math.random() < 0.40 ? '1' : '0';
     sessionStorage.setItem(SK.raw, rawCard);
   }
 

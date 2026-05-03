@@ -140,10 +140,12 @@ async function getWikipediaImage(title) {
 // 2. Wikipedia image for the topic (free, topic-relevant, high quality)
 // 3. Source homepage og:image (brand logo — last resort)
 async function getThumb(s) {
-  // YouTube search/results URLs have no useful og:image (returns logo only).
-  // Skip straight to Wikipedia for video cards.
-  const isSearchPage = /\/(results|search)\?/i.test(s.url || '');
-  if (!isSearchPage) {
+  // Skip og:image fetch for URLs that won't yield article images:
+  // - YouTube/Google search results pages → logo only
+  // - news.google.com redirect URLs → returns Google News logo, not article image
+  const skipOg = /\/(results|search)\?/i.test(s.url || '')
+               || /news\.google\.com/i.test(s.url || '');
+  if (!skipOg) {
     const fromArticle = await fetchOgImage(s.url);
     if (fromArticle) return fromArticle;
   }

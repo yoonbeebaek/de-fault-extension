@@ -96,7 +96,9 @@ async function fetchOgImage(url) {
   try {
     const resp = await timedFetch(url);
     if (!resp.ok) return null;
-    return extractOgImage(await resp.text(), url);
+    // Use resp.url (final URL after redirects) as base so relative og:image paths
+    // resolve against the actual article domain, not the original Google News URL.
+    return extractOgImage(await resp.text(), resp.url || url);
   } catch { return null; }
 }
 
@@ -140,12 +142,10 @@ async function getWikipediaImage(title) {
 // 2. Wikipedia image for the topic (free, topic-relevant, high quality)
 // 3. Source homepage og:image (brand logo — last resort)
 async function getThumb(s) {
-  // Skip og:image fetch for URLs that won't yield article images:
-  // - YouTube/Google search results pages → logo only
-  // - news.google.com redirect URLs → returns Google News logo, not article image
-  const skipOg = /\/(results|search)\?/i.test(s.url || '')
-               || /news\.google\.com/i.test(s.url || '');
-  if (!skipOg) {
+  // Skip og:image for search/results pages — they return site logos, not article images.
+  // Google News redirect URLs are followed transparently by fetch() so they work fine.
+  const isSearchPage = /\/(results|search)\?/i.test(s.url || '');
+  if (!isSearchPage) {
     const fromArticle = await fetchOgImage(s.url);
     if (fromArticle) return fromArticle;
   }

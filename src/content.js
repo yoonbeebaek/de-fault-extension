@@ -428,12 +428,8 @@ function initSession(intent) {
     sessionStorage.setItem(SK.hl, hl);
   }
 
-  // Raw POV card — 40% chance per session; card 2 pulls from Reddit/X/social sources
-  let rawCard = sessionStorage.getItem(SK.raw);
-  if (rawCard === null) {
-    rawCard = Math.random() < 0.40 ? '1' : '0';
-    sessionStorage.setItem(SK.raw, rawCard);
-  }
+  // Raw POV card — 40% chance each page load (not cached so every visit is a fresh draw)
+  const rawCard = Math.random() < 0.40 ? '1' : '0';
 
   return { discipline, color, angle, angleIdx: +ai, headline: hl, rawCard: rawCard === '1' };
 }

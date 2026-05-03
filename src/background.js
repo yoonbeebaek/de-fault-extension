@@ -139,34 +139,19 @@ async function getWikipediaImage(title) {
 }
 
 // ─── Thumbnail resolution chain ────────────────────────────────
-// 1. Article og:image (if AI returned a real URL with a path)
-// 2. Wikipedia image for the topic (free, topic-relevant, high quality)
-// 3. Source homepage og:image (brand logo — last resort)
+// 1. Article og:image — only for direct article URLs (not Google News redirects)
+// 2. null → card renders its type icon (ARTICLE/VIDEO/AUDIO) as designed fallback
+//
+// Google News RSS returns redirect URLs (news.google.com/rss/articles/CBMi...)
+// that don't forward to the real article in service worker context — fetch()
+// lands on the Google News page and extracts their logo. Skip those entirely.
 async function getThumb(s) {
-  // Skip og:image fetch for URLs that can't yield the real article image:
-  // Google News RSS URLs (news.google.com/rss/...) don't redirect to the article
-  // in service worker context — fetch() gets the Google News page and its logo.
   const skipOg = /\/(results|search)\?/i.test(s.url || '')
                || /news\.google\.com/i.test(s.url || '');
   if (!skipOg) {
     const fromArticle = await fetchOgImage(s.url);
     if (fromArticle) return fromArticle;
   }
-
-  const fromWiki = await getWikipediaImage(s.title);
-  if (fromWiki) return fromWiki;
-
-  const domain = SOURCE_DOMAINS[(s.source || '').toLowerCase().trim()];
-  if (domain) {
-    try {
-      const resp = await timedFetch(`https://${domain}`);
-      if (resp.ok) {
-        const img = extractOgImage(await resp.text(), `https://${domain}`);
-        if (img) return img;
-      }
-    } catch { /* ignore */ }
-  }
-
   return null;
 }
 

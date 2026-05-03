@@ -179,10 +179,12 @@ async function getThumb(s) {
 // Discipline → preferred publications matching De.fault's editorial vibe.
 // Substack + Medium added to each discipline to surface essays and personal
 // writing that Google News RSS wouldn't otherwise index.
+// Keep domain filters short — long URLs cause Google News RSS to return no results.
+// Niche/independent publishers are handled via Gemini's system prompt + SOURCE_DOMAINS fallback.
 const DISCIPLINE_DOMAINS = {
-  communicational: 'site:theatlantic.com OR site:newyorker.com OR site:lithub.com OR site:theguardian.com OR site:longreads.com OR site:e-flux.com OR site:designobserver.com OR site:printmag.com OR site:aeon.co OR site:noemamag.com OR site:ribbonfarm.com OR site:interintellect.com OR site:medium.com OR site:substack.com OR site:reddit.com',
-  economical:      'site:economist.com OR site:ft.com OR site:bloomberg.com OR site:hbr.org OR site:vox.com OR site:businessoffashion.com OR site:datasociety.net OR site:ribbonfarm.com OR site:adweek.com OR site:medium.com OR site:substack.com OR site:reddit.com',
-  ecological:      'site:nature.com OR site:scientificamerican.com OR site:nationalgeographic.com OR site:newscientist.com OR site:wired.com OR site:longnow.org OR site:datasociety.net OR site:forensic-architecture.org OR site:noemamag.com OR site:aeon.co OR site:medium.com OR site:substack.com OR site:reddit.com',
+  communicational: 'site:theatlantic.com OR site:newyorker.com OR site:theguardian.com OR site:lithub.com OR site:medium.com OR site:substack.com OR site:reddit.com',
+  economical:      'site:economist.com OR site:ft.com OR site:bloomberg.com OR site:hbr.org OR site:vox.com OR site:medium.com OR site:substack.com OR site:reddit.com',
+  ecological:      'site:nature.com OR site:scientificamerican.com OR site:nationalgeographic.com OR site:wired.com OR site:newscientist.com OR site:medium.com OR site:substack.com OR site:reddit.com',
 };
 
 // Raw POV card — sources with unfiltered community voice

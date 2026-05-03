@@ -269,20 +269,34 @@ function getPageContext() {
 
   // Twitter / X
   if (host.includes('twitter.com') || host.includes('x.com')) {
+    // Single tweet: use tweet body text
     const el = document.querySelector('[data-testid="tweetText"]');
     if (el?.textContent.trim().length > 10)
       return { context: el.textContent.trim().slice(0, 200) };
-    // Fallback to og:title if tweet text not yet rendered
-    const og = document.querySelector('meta[property="og:title"]')?.content?.trim();
-    if (og?.length > 10) return { context: og.slice(0, 200) };
+    // Search results: use the search query from URL (?q=...)
+    const sq = new URLSearchParams(window.location.search).get('q');
+    if (sq?.trim().length >= 5) return { context: sq.trim().slice(0, 200) };
+    // Fallback: og:title or document.title cleaned up
+    const tt = (document.querySelector('meta[property="og:title"]')?.content
+               || document.title || '')
+               .replace(/\s*[·|]\s*X\s*$/, '').replace(/\s*[·|]\s*Twitter\s*$/i, '').trim();
+    if (tt?.length > 10 && !/^(x|twitter)$/i.test(tt)) return { context: tt.slice(0, 200) };
   }
 
   // Instagram posts/reels
   if (host.includes('instagram.com')) {
+    // og:title format on direct load: "username on Instagram: 'caption text'"
     const og = document.querySelector('meta[property="og:title"]')?.content?.trim();
-    // og:title format: "username on Instagram: 'caption text'"
     const caption = og?.replace(/^.+?on Instagram:\s*["']?/i, '').replace(/["']$/, '').trim();
     if (caption?.length >= 10) return { context: caption.slice(0, 200) };
+    // SPA navigation: og:title isn't updated — read the post image alt (set by React on mount)
+    const img = document.querySelector(
+      'div[role="dialog"] img[alt], article img[alt], main img[alt]'
+    );
+    if (img?.alt?.length >= 10) return { context: img.alt.slice(0, 200) };
+    // Last resort: document.title (React does update this on SPA nav)
+    const dt = document.title?.replace(/\s*[-–]\s*Instagram\s*$/i, '').trim();
+    if (dt?.length >= 10 && !/^instagram$/i.test(dt)) return { context: dt.slice(0, 200) };
   }
 
   // TikTok videos
@@ -290,6 +304,9 @@ function getPageContext() {
     const og = document.querySelector('meta[property="og:title"]')?.content?.trim();
     const clean = og?.replace(/\|\s*TikTok\s*$/i, '').trim();
     if (clean?.length >= 8) return { context: clean.slice(0, 200) };
+    // SPA nav: document.title is updated by TikTok's React
+    const dt = document.title?.replace(/\|\s*TikTok\s*$/i, '').trim();
+    if (dt?.length >= 8 && !/^tiktok$/i.test(dt)) return { context: dt.slice(0, 200) };
   }
 
   // Threads posts
@@ -1198,14 +1215,16 @@ async function loadSuggestions() {
 
 function isContextTriggerable(context, intent) {
   if (!context || context.length < 10) return false;
-  // For the most generic intent, require a more substantive context string
-  if (intent === "I'm open to discovery" && context.length < 30) return false;
+  // For open-ended discovery, avoid firing on single generic words like "Home"
+  if (intent === "I'm open to discovery" && context.length < 15) return false;
   return true;
 }
 
 // ─── Boot ──────────────────────────────────────────────────────
 
 async function boot() {
+  const bootUrl = location.href;
+
   const pageCtx = getPageContext();
   if (!pageCtx) { mountInactiveFAB(); return; }
 
@@ -1236,7 +1255,9 @@ async function boot() {
         .catch(err => ({ ok: false, error: err?.message || 'Request failed' }));
 
   await new Promise(r => setTimeout(r, 600));
-  if (!getPageContext()) return;
+  // Abort only if SPA navigated away — don't re-call getPageContext() which can
+  // transiently return null on dynamic pages and incorrectly block mounting.
+  if (location.href !== bootUrl) return;
 
   mount(session);
 

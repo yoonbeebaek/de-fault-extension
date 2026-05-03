@@ -138,21 +138,38 @@ async function getWikipediaImage(title) {
   } catch { return null; }
 }
 
-// ─── Thumbnail resolution chain ────────────────────────────────
-// 1. Article og:image — only for direct article URLs (not Google News redirects)
-// 2. null → card renders its type icon (ARTICLE/VIDEO/AUDIO) as designed fallback
+// ─── Page meta fetch ──────────────────────────────────────────
+// Single fetch resolves both the real article title and og:image.
+// This ensures the card title matches the linked URL (they come from
+// the same page), fixing the title/URL mismatch the user sees.
 //
-// Google News RSS returns redirect URLs (news.google.com/rss/articles/CBMi...)
-// that don't forward to the real article in service worker context — fetch()
-// lands on the Google News page and extracts their logo. Skip those entirely.
-async function getThumb(s) {
-  const skipOg = /\/(results|search)\?/i.test(s.url || '')
-               || /news\.google\.com/i.test(s.url || '');
-  if (!skipOg) {
-    const fromArticle = await fetchOgImage(s.url);
-    if (fromArticle) return fromArticle;
-  }
-  return null;
+// Skipped for Google News redirect URLs (service worker fetch lands on
+// the GNews page, not the article) and Google/YouTube search result pages.
+async function fetchPageMeta(url) {
+  if (!url) return { title: null, image: null };
+  const isSkipped = /news\.google\.com/i.test(url)
+                 || /google\.com\/search/i.test(url)
+                 || /youtube\.com\/(results|search)/i.test(url);
+  if (isSkipped) return { title: null, image: null };
+
+  try {
+    const resp = await timedFetch(url, 7000);
+    if (!resp.ok) return { title: null, image: null };
+    const html  = await resp.text();
+    const base  = resp.url || url;
+
+    const image = extractOgImage(html, base);
+
+    // og:title preferred; fall back to <title> tag
+    const ogM  = html.match(/property=["']og:title["'][^>]*content=["']([^"']{5,200})["']/i)
+              || html.match(/content=["']([^"']{5,200})["'][^>]*property=["']og:title["']/i);
+    const tagM = html.match(/<title[^>]*>([^<]{5,200})<\/title>/i);
+    let title  = (ogM?.[1] || tagM?.[1] || '').trim();
+    // Strip trailing site-name suffix ("Article – Site Name" → "Article")
+    title = title.replace(/\s*[-–—|·•]\s*.{1,80}$/, '').trim();
+
+    return { title: title || null, image };
+  } catch { return { title: null, image: null }; }
 }
 
 // ─── URL resolution via Google News RSS ───────────────────────
@@ -269,8 +286,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             result.data.map(async (s, i) => {
               const isRaw = rawCard && i === 2;
               const url   = await resolveUrl(s, disciplineKey, i, rawCard);
-              const image = await getThumb({ ...s, url });
-              return { ...s, url, image, ...(isRaw ? { raw: true } : {}) };
+              // Single fetch: real page title + og:image from the resolved URL.
+              // Title overrides Gemini's invented title so card matches the link.
+              const { title: realTitle, image } = await fetchPageMeta(url);
+              return {
+                ...s,
+                url,
+                image,
+                ...(realTitle ? { title: realTitle } : {}),
+                ...(isRaw ? { raw: true } : {}),
+              };
             })
           );
         }

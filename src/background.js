@@ -138,10 +138,25 @@ async function getWikipediaImage(title) {
   } catch { return null; }
 }
 
+// ─── Clearbit publisher logo (free, no key) ───────────────────
+async function getClearbitLogo(url) {
+  if (!url) return null;
+  try {
+    const domain = new URL(url).hostname.replace(/^www\./, '');
+    // Skip generic/search domains — their logos aren't meaningful as thumbnails
+    if (!domain || /google\.|reddit\.com|twitter\.com|x\.com|youtube\.|bing\./i.test(domain)) return null;
+    const logoUrl = `https://logo.clearbit.com/${domain}`;
+    const resp = await timedFetch(logoUrl, 3000, { method: 'HEAD' });
+    return resp.ok ? logoUrl : null;
+  } catch { return null; }
+}
+
 // ─── Page meta fetch ──────────────────────────────────────────
-// Single fetch resolves both the real article title and og:image.
-// This ensures the card title matches the linked URL (they come from
-// the same page), fixing the title/URL mismatch the user sees.
+// Thumbnail chain:
+//   A — og:image scraped directly from the resolved article URL
+//   B — Wikipedia image (Gemini's suggestion title → topic-relevant image)
+//   C — Clearbit publisher logo (domain-based brand mark, free, no key)
+//   D — null → card renders type icon
 //
 // Skipped for Google News redirect URLs (service worker fetch lands on
 // the GNews page, not the article) and Google/YouTube search result pages.
@@ -174,13 +189,17 @@ async function fetchPageMeta(url, fallbackTitle = '') {
     } catch {}
   }
 
-  // B/C: no og:image yet (Google News redirect, Google search, or page had none)
-  //      → try Wikipedia with Gemini's suggestion title as search query
+  // B: no og:image → try Wikipedia with Gemini's suggestion title
   if (!image && fallbackTitle) {
     image = await getWikipediaImage(fallbackTitle);
   }
 
-  // D: if Wikipedia also fails → image stays null → card shows type icon
+  // C: Wikipedia also failed → Clearbit publisher logo from article domain
+  if (!image) {
+    image = await getClearbitLogo(url);
+  }
+
+  // D: all failed → image null → card shows type icon
 
   return { title, image };
 }

@@ -106,12 +106,15 @@ async function runAI({ context, intent, contentTypeDesc, disciplineKey, discipli
     text = await session.prompt(
       `Lens: ${disciplineKey} — ${disciplineDesc}\n` +
       `Topic: "${context}". Intent: "${intent}". Angle: ${contentTypeDesc}\n\n` +
-      `Give 3 suggestions. Card 1: ARTICLE (essay or analysis). Card 2: VIDEO (talk, documentary, or lecture). Card 3: ARTICLE or AUDIO (podcast) — your pick.\n` +
-      `'query': 4-6 plain search terms (no quotes, no site:) to find real content on this topic.\n` +
+      `Fill 3 editorial slots. Each slot has a fixed role — pick content that best serves it:\n` +
+      `Slot 1 "Deep Dive": a weighty essay, long-read, or research piece that goes to the root. type=ARTICLE.\n` +
+      `Slot 2 "Visual Proof": a video essay, short documentary, or visual explainer — something that makes the concept visceral to watch. type=VIDEO.\n` +
+      `Slot 3 "Raw POV": an unfiltered community take — a Reddit thread, Substack essay, or social debate that captures how real people react to this. type=SOCIAL.\n` +
+      `'query': 4-6 plain search terms (no quotes, no site:) per slot.\n` +
       `JSON only — no markdown, no URLs:\n` +
       `[{"title":"...","source":"...","type":"ARTICLE","query":"..."},` +
       `{"title":"...","source":"...","type":"VIDEO","query":"..."},` +
-      `{"title":"...","source":"...","type":"ARTICLE","query":"..."}]`,
+      `{"title":"...","source":"...","type":"SOCIAL","query":"..."}]`,
     );
   } catch (e) {
     _sess = null;

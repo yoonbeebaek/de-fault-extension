@@ -226,8 +226,10 @@ const DISCIPLINE_DOMAINS = {
   ecological:      'site:nature.com OR site:scientificamerican.com OR site:nationalgeographic.com OR site:wired.com OR site:newscientist.com OR site:medium.com OR site:substack.com OR site:reddit.com',
 };
 
-// Raw POV card — sources with unfiltered community voice
-const RAW_DOMAINS = 'site:reddit.com OR site:x.com OR site:twitter.com';
+// Raw POV — sources with unfiltered community voice (Slot 3)
+const RAW_DOMAINS    = 'site:reddit.com OR site:substack.com OR site:x.com OR site:twitter.com';
+// Visual Proof — quality video modifiers to avoid algorithm-polluted content (Slot 2)
+const VIDEO_MODIFIER = '"video essay" OR documentary OR lecture';
 
 async function rssFirstLink(query) {
   const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
@@ -242,7 +244,7 @@ async function rssFirstLink(query) {
   } catch { return null; }
 }
 
-async function resolveUrl(s, disciplineKey, cardIndex, rawCard = false) {
+async function resolveUrl(s, disciplineKey, cardIndex) {
   const type      = (s.type || 'ARTICLE').toUpperCase();
   const title     = s.title  || '';
   const source    = s.source || '';
@@ -251,38 +253,41 @@ async function resolveUrl(s, disciplineKey, cardIndex, rawCard = false) {
   const baseQuery = s.query
     || [title.split(/\s+/).slice(0, 5).join(' '), source].filter(Boolean).join(' ');
 
-  // VIDEO: search for real video links on known platforms via Google News RSS.
-  // Prefer /watch URLs; accept any hit. Falls back to Google search (not YouTube
-  // search results page, which always shows multiple unrelated videos).
+  // Slot 2 "Visual Proof": quality video essays/documentaries on YouTube, Vimeo, TED.
+  // VIDEO_MODIFIER filters out algorithm-bait; falls back to Google video search.
   if (type === 'VIDEO') {
-    const videoHit = await rssFirstLink(`(${baseQuery}) site:youtube.com OR site:vimeo.com OR site:ted.com`);
+    const videoHit = await rssFirstLink(`(${baseQuery}) (${VIDEO_MODIFIER}) site:youtube.com OR site:vimeo.com OR site:ted.com`);
     if (videoHit) return videoHit;
-    return `https://www.google.com/search?q=${encodeURIComponent(baseQuery + ' video')}`;
+    // Broader fallback without modifier — still better than plain "video"
+    const videoFallback = await rssFirstLink(`(${baseQuery}) site:youtube.com OR site:vimeo.com OR site:ted.com`);
+    if (videoFallback) return videoFallback;
+    return `https://www.google.com/search?q=${encodeURIComponent(baseQuery + ' video essay')}`;
   }
 
-  const isWildcard = cardIndex >= 2;
-  const isRawCard  = isWildcard && rawCard;
-
-  if (isRawCard) {
-    // Raw POV card: Reddit/X community voice
+  // Slot 3 "Raw POV": unfiltered community voice — Reddit, Substack, Twitter.
+  if (type === 'SOCIAL') {
     const hit = await rssFirstLink(`(${baseQuery}) ${RAW_DOMAINS}`);
     if (hit) return hit;
-    // fallback to unfiltered
-    const hit2 = await rssFirstLink(baseQuery);
+    // Substack-only fallback (often richer than social noise)
+    const hit2 = await rssFirstLink(`(${baseQuery}) site:substack.com`);
     if (hit2) return hit2;
-  } else if (isWildcard) {
-    // Normal wildcard: no editorial filter
-    const hit = await rssFirstLink(baseQuery);
-    if (hit) return hit;
-  } else {
-    // Cards 0 & 1: domain-filtered and general queries run IN PARALLEL;
-    // whichever returns first wins — halves sequential latency.
+    return `https://www.google.com/search?q=${encodeURIComponent(baseQuery + ' reddit OR substack')}`;
+  }
+
+  // Slot 1 "Deep Dive" (ARTICLE) + AUDIO:
+  // Cards 0 & 1: domain-filtered and general queries run IN PARALLEL;
+  // whichever returns first wins — halves sequential latency.
+  if (cardIndex <= 1) {
     const domainFilter = DISCIPLINE_DOMAINS[disciplineKey];
     const [hit1, hit2] = await Promise.all([
       domainFilter ? rssFirstLink(`(${baseQuery}) ${domainFilter}`) : Promise.resolve(null),
       rssFirstLink(baseQuery),
     ]);
     const hit = hit1 || hit2;
+    if (hit) return hit;
+  } else {
+    // Unexpected extra card: unfiltered
+    const hit = await rssFirstLink(baseQuery);
     if (hit) return hit;
   }
 
@@ -313,17 +318,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
         if (result.ok && Array.isArray(result.data)) {
           const disciplineKey = message.payload?.disciplineKey;
-          const rawCard       = !!message.payload?.rawCard;
-          // If Gemini returned all ARTICLEs despite the prompt, force card 1 to VIDEO
-          // so there's always at least one non-article in the set.
-          if (result.data.length >= 2 &&
-              result.data.every(s => (s.type || 'ARTICLE').toUpperCase() === 'ARTICLE')) {
-            result.data[1] = { ...result.data[1], type: 'VIDEO' };
-          }
           result.data = await Promise.all(
             result.data.map(async (s, i) => {
-              const isRaw = rawCard && i === 2;
-              const url   = await resolveUrl(s, disciplineKey, i, rawCard);
+              const isRaw = (s.type || '').toUpperCase() === 'SOCIAL';
+              const url   = await resolveUrl(s, disciplineKey, i);
               // Single fetch: real page title + og:image from the resolved URL.
               // Title overrides Gemini's invented title so card matches the link.
               const { title: realTitle, image } = await fetchPageMeta(url, s.title);

@@ -428,10 +428,7 @@ function initSession(intent) {
     sessionStorage.setItem(SK.hl, hl);
   }
 
-  // Raw POV card — 40% chance each page load (not cached so every visit is a fresh draw)
-  const rawCard = Math.random() < 0.40 ? '1' : '0';
-
-  return { discipline, color, angle, angleIdx: +ai, headline: hl, rawCard: rawCard === '1' };
+  return { discipline, color, angle, angleIdx: +ai, headline: hl };
 }
 
 function rotateAngle(intent, currentIdx) {
@@ -1177,7 +1174,6 @@ function fetchPayload() {
     contentTypeDesc: appState.angle.desc,
     disciplineKey:   appState.discipline.key,
     disciplineDesc:  appState.discipline.desc,
-    rawCard:         appState.rawCard,
   };
 }
 
@@ -1239,7 +1235,6 @@ async function boot() {
     angleIdx:   session.angleIdx,
     discipline: session.discipline,
     color:      session.color,
-    rawCard:    session.rawCard,
   };
 
   const key = cacheKey();

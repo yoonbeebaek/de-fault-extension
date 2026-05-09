@@ -314,6 +314,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (result.ok && Array.isArray(result.data)) {
           const disciplineKey = message.payload?.disciplineKey;
           const rawCard       = !!message.payload?.rawCard;
+          // If Gemini returned all ARTICLEs despite the prompt, force card 1 to VIDEO
+          // so there's always at least one non-article in the set.
+          if (result.data.length >= 2 &&
+              result.data.every(s => (s.type || 'ARTICLE').toUpperCase() === 'ARTICLE')) {
+            result.data[1] = { ...result.data[1], type: 'VIDEO' };
+          }
           result.data = await Promise.all(
             result.data.map(async (s, i) => {
               const isRaw = rawCard && i === 2;

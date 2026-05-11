@@ -12,7 +12,7 @@ const ANGLE_HEADLINES = {
   backstory:   ["Check out the backstory", "This started somewhere unexpected"],
   opinion:     ["Not everyone agrees on this", "The debate hiding in plain sight", "Voices from the other side"],
   adjacent:    ["Hey, have you heard about this?", "Something unexpected lives right next door"],
-  alternative: ["Shall we explore different perspectives", "We could look at this differently"],
+  alternative: ["Shall we explore different perspectives?", "We could look at this differently"],
   contributor: ["More pieces of this puzzle", "You might be surprised what played a part"],
   examples:    ["What this looks like in the wild", "Real cases that change the picture"],
 };

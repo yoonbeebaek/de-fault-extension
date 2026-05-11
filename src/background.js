@@ -74,32 +74,61 @@ function timedFetch(url, ms = 6000, opts = {}) {
     .finally(() => clearTimeout(t));
 }
 
-function extractOgImage(html, base) {
-  const patterns = [
+function toAbsUrl(src, base) {
+  if (!src) return null;
+  try { return src.startsWith('http') ? src : new URL(src, base).href; }
+  catch { return null; }
+}
+
+// 4-stage image extractor — each stage falls through to the next on failure.
+function extractBestImage(html, base) {
+  // Stage 1: Standard meta tags — og:image, twitter:image, itemprop=image
+  const metaPatterns = [
     /property=["']og:image(?::url)?["'][^>]*content=["']([^"'\s]{8,})["']/i,
     /content=["']([^"'\s]{8,})["'][^>]*property=["']og:image(?::url)?["']/i,
     /name=["']twitter:image(?::src)?["'][^>]*content=["']([^"'\s]{8,})["']/i,
     /content=["']([^"'\s]{8,})["'][^>]*name=["']twitter:image(?::src)?["']/i,
+    /itemprop=["']image["'][^>]*content=["']([^"'\s]{8,})["']/i,
+    /content=["']([^"'\s]{8,})["'][^>]*itemprop=["']image["']/i,
   ];
-  for (const re of patterns) {
+  for (const re of metaPatterns) {
     const m = html.match(re);
-    if (!m?.[1]) continue;
-    try { return m[1].startsWith('http') ? m[1] : new URL(m[1], base).href; }
-    catch { continue; }
+    const url = m?.[1] && toAbsUrl(m[1], base);
+    if (url) return url;
   }
-  return null;
-}
 
-async function fetchOgImage(url) {
-  // Reject template placeholders and bare domains (need a path to be an article)
-  if (!url || !/^https?:\/\/[a-z0-9][-a-z0-9.]{2,}\.[a-z]{2,}\/.+/i.test(url)) return null;
-  try {
-    const resp = await timedFetch(url);
-    if (!resp.ok) return null;
-    // Use resp.url (final URL after redirects) as base so relative og:image paths
-    // resolve against the actual article domain, not the original Google News URL.
-    return extractOgImage(await resp.text(), resp.url || url);
-  } catch { return null; }
+  // Stage 2: <link rel="image_src"> (older blogs, Tumblr-era sites)
+  const linkM = html.match(/<link[^>]+rel=["']image_src["'][^>]+href=["']([^"'\s]{8,})["']/i)
+             || html.match(/<link[^>]+href=["']([^"'\s]{8,})["'][^>]+rel=["']image_src["']/i);
+  const linkUrl = linkM?.[1] && toAbsUrl(linkM[1], base);
+  if (linkUrl) return linkUrl;
+
+  // Stage 3: First <img> inside <article> or <main> — skip tracking pixels.
+  // Regex finds the first semantic content block, then scans its img tags.
+  const bodyM = html.match(/<(?:article|main)\b[^>]*>([\s\S]{20,}?)(?=<\/(?:article|main)>|$)/i);
+  if (bodyM) {
+    const imgRe = /<img\b([^>]{10,})>/gi;
+    let m;
+    while ((m = imgRe.exec(bodyM[1])) !== null) {
+      const attrs = m[1];
+      // Skip 1×1 tracking pixels and data URIs
+      if (/\bwidth=["']?1["']?\b/i.test(attrs) || /\bheight=["']?1["']?\b/i.test(attrs)) continue;
+      const srcM = attrs.match(/\bsrc=["']([^"']{10,})["']/i);
+      const src  = srcM?.[1];
+      if (!src || /\bdata:/i.test(src)) continue;
+      if (/\b(pixel|beacon|track|analytics|1x1)\b/i.test(src)) continue;
+      const imgUrl = toAbsUrl(src, base);
+      if (imgUrl) return imgUrl;
+    }
+  }
+
+  // Stage 4: apple-touch-icon — high-res brand logo (180px+), better than favicon
+  const iconM = html.match(/<link[^>]+rel=["']apple-touch-icon(?:-precomposed)?["'][^>]+href=["']([^"'\s]{4,})["']/i)
+             || html.match(/<link[^>]+href=["']([^"'\s]{4,})["'][^>]+rel=["']apple-touch-icon(?:-precomposed)?["']/i);
+  const iconUrl = iconM?.[1] && toAbsUrl(iconM[1], base);
+  if (iconUrl) return iconUrl;
+
+  return null;
 }
 
 // ─── Wikipedia image (free, no key, high quality, topic-relevant) ─
@@ -179,7 +208,7 @@ async function fetchPageMeta(url, fallbackTitle = '') {
       if (resp.ok) {
         const html = await resp.text();
         const base = resp.url || url;
-        image = extractOgImage(html, base);
+        image = extractBestImage(html, base);
         const ogM  = html.match(/property=["']og:title["'][^>]*content=["']([^"']{5,200})["']/i)
                   || html.match(/content=["']([^"']{5,200})["'][^>]*property=["']og:title["']/i);
         const tagM = html.match(/<title[^>]*>([^<]{5,200})<\/title>/i);

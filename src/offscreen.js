@@ -110,7 +110,7 @@ async function runAI({ context, intent, contentTypeDesc, disciplineKey, discipli
       `Slot 1 "Deep Dive": a weighty essay, long-read, or research piece that goes to the root. type=ARTICLE.\n` +
       `Slot 2 "Visual Proof": a video essay, short documentary, or visual explainer — something that makes the concept visceral to watch. type=VIDEO.\n` +
       `Slot 3 "Raw POV": an unfiltered community take — a Reddit thread, Substack essay, or social debate that captures how real people react to this. type=SOCIAL.\n` +
-      `'query': 4-6 plain search terms (no quotes, no site:) per slot.\n` +
+      `'query': 2-3 core nouns only (e.g. "AI consciousness" or "T-Rex growth"). MAXIMUM 3 words. NO long phrases, NO quotes, NO site:.\n` +
       `JSON only — no markdown, no URLs:\n` +
       `[{"title":"...","source":"...","type":"ARTICLE","query":"..."},` +
       `{"title":"...","source":"...","type":"VIDEO","query":"..."},` +

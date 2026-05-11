@@ -481,13 +481,8 @@ const SOURCE_DOMAINS = {
   'wikipedia': 'wikipedia.org', 'reddit': 'reddit.com',
 };
 
-// URL is resolved by background.js (Google News RSS or YouTube search).
-// s.url is always set and reliable by the time it reaches here.
-// This function is a last-resort safety net only.
 function cardUrl(s) {
-  if (s.url) return s.url;
-  const q = encodeURIComponent([s.title, s.source].filter(Boolean).join(' '));
-  return `https://www.google.com/search?q=${q}`;
+  return s.url || '';
 }
 
 

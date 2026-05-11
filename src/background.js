@@ -248,35 +248,36 @@ async function resolveUrl(s, disciplineKey, cardIndex) {
   const type      = (s.type || 'ARTICLE').toUpperCase();
   const title     = s.title  || '';
   const source    = s.source || '';
-  // Prefer Gemini's focused query field (4-6 terms) — if absent, use first
-  // 5 words of title + source so the fallback search stays broad enough to hit real articles.
+  // Gemini now produces 2-3 core nouns for query. Fallback: first 3 words of title.
   const baseQuery = s.query
-    || [title.split(/\s+/).slice(0, 5).join(' '), source].filter(Boolean).join(' ');
+    || title.split(/\s+/).slice(0, 3).join(' ');
+  // Retry budget: strip to first 2 words for the broadest possible RSS hit.
+  const shortQuery = baseQuery.split(/\s+/).slice(0, 2).join(' ');
 
-  // Slot 2 "Visual Proof": quality video essays/documentaries on YouTube, Vimeo, TED.
-  // VIDEO_MODIFIER filters out algorithm-bait; falls back to Google video search.
+  // Slot 2 "Visual Proof": video essays/documentaries on YouTube and TED.
+  // Vimeo excluded — RSS returns too few results.
   if (type === 'VIDEO') {
-    const videoHit = await rssFirstLink(`(${baseQuery}) (${VIDEO_MODIFIER}) site:youtube.com OR site:vimeo.com OR site:ted.com`);
-    if (videoHit) return videoHit;
-    // Broader fallback without modifier — still better than plain "video"
-    const videoFallback = await rssFirstLink(`(${baseQuery}) site:youtube.com OR site:vimeo.com OR site:ted.com`);
-    if (videoFallback) return videoFallback;
-    return `https://www.google.com/search?q=${encodeURIComponent(baseQuery + ' video essay')}`;
-  }
-
-  // Slot 3 "Raw POV": unfiltered community voice — Reddit, Substack, Twitter.
-  if (type === 'SOCIAL') {
-    const hit = await rssFirstLink(`(${baseQuery}) ${RAW_DOMAINS}`);
-    if (hit) return hit;
-    // Substack-only fallback (often richer than social noise)
-    const hit2 = await rssFirstLink(`(${baseQuery}) site:substack.com`);
+    const hit1 = await rssFirstLink(`(${baseQuery}) (${VIDEO_MODIFIER}) site:youtube.com OR site:ted.com`);
+    if (hit1) return hit1;
+    const hit2 = await rssFirstLink(`(${baseQuery}) site:youtube.com OR site:ted.com`);
     if (hit2) return hit2;
-    return `https://www.google.com/search?q=${encodeURIComponent(baseQuery + ' reddit OR substack')}`;
+    // Last retry: 2-word query, no site filter
+    const hit3 = await rssFirstLink(shortQuery);
+    if (hit3) return hit3;
+    return null;
   }
 
-  // Slot 1 "Deep Dive" (ARTICLE) + AUDIO:
-  // Cards 0 & 1: domain-filtered and general queries run IN PARALLEL;
-  // whichever returns first wins — halves sequential latency.
+  // Slot 3 "Raw POV": Reddit, Substack, Twitter community voice.
+  if (type === 'SOCIAL') {
+    const hit1 = await rssFirstLink(`(${baseQuery}) ${RAW_DOMAINS}`);
+    if (hit1) return hit1;
+    // Retry with short keywords, no domain filter
+    const hit2 = await rssFirstLink(shortQuery);
+    if (hit2) return hit2;
+    return null;
+  }
+
+  // Slot 1 "Deep Dive" (ARTICLE): domain-filtered + general run IN PARALLEL.
   if (cardIndex <= 1) {
     const domainFilter = DISCIPLINE_DOMAINS[disciplineKey];
     const [hit1, hit2] = await Promise.all([
@@ -286,19 +287,14 @@ async function resolveUrl(s, disciplineKey, cardIndex) {
     const hit = hit1 || hit2;
     if (hit) return hit;
   } else {
-    // Unexpected extra card: unfiltered
     const hit = await rssFirstLink(baseQuery);
     if (hit) return hit;
   }
 
-  // Fallback: site-specific Google search → generic Google search
-  // Use baseQuery (Gemini's search terms) not the title — the title may be
-  // a creative description that doesn't match any real article headline.
-  const domain = SOURCE_DOMAINS[(source).toLowerCase().trim()];
-  const qEnc = encodeURIComponent(baseQuery);
-  if (domain) return `https://www.google.com/search?q=site:${domain}+${qEnc}`;
-  if (type === 'AUDIO') return `https://www.google.com/search?q=${qEnc}+podcast`;
-  return `https://www.google.com/search?q=${qEnc}`;
+  // Last retry: 2-word query, no filters
+  const retry = await rssFirstLink(shortQuery);
+  if (retry) return retry;
+  return null;
 }
 
 // ─── Message handler ───────────────────────────────────────────
@@ -322,6 +318,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             result.data.map(async (s, i) => {
               const isRaw = (s.type || '').toUpperCase() === 'SOCIAL';
               const url   = await resolveUrl(s, disciplineKey, i);
+              if (!url) return null; // RSS failed all retries — drop this card
               // Single fetch: real page title + og:image from the resolved URL.
               // Title overrides Gemini's invented title so card matches the link.
               const { title: realTitle, image } = await fetchPageMeta(url, s.title);
@@ -334,6 +331,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               };
             })
           );
+          // Drop cards that couldn't resolve to a real URL
+          result.data = result.data.filter(Boolean);
         }
         sendResponse(result);
       } catch (e) {

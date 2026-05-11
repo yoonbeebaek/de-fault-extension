@@ -1018,7 +1018,9 @@ function mountInactiveFAB() {
   document.documentElement.appendChild(inactiveHost);
 }
 
-function mount(session) {
+// initialCards: pre-rendered HTML injected at mount time so the panel
+// never shows a loading skeleton on first appearance.
+function mount(session, initialCards = '') {
   if (host) return;
   if (inactiveHost) { inactiveHost.remove(); inactiveHost = null; }
   _dfActive = true;
@@ -1044,7 +1046,7 @@ function mount(session) {
       </div>
       <div class="df-bar"></div>
       <div class="df-scroll">
-        <div class="cards" id="cards">${renderLoading()}</div>
+        <div class="cards" id="cards">${initialCards}</div>
         <div class="footer">
           <a class="feedback-link"
              href="mailto:yoonbeebaek@gmail.com?subject=De.fault%20Feedback">Send Feedback</a>
@@ -1233,29 +1235,31 @@ async function boot() {
   const key = cacheKey();
   const hit = sessionStorage.getItem(key);
 
-  // Fire AI request in parallel with 600ms settle wait (unless cached)
-  const earlyFetch = hit
-    ? null
-    : chrome.runtime.sendMessage({ type: 'FETCH_SUGGESTIONS', payload: fetchPayload() })
-        .catch(err => ({ ok: false, error: err?.message || 'Request failed' }));
-
-  await new Promise(r => setTimeout(r, 600));
-  // Abort only if SPA navigated away — don't re-call getPageContext() which can
-  // transiently return null on dynamic pages and incorrectly block mounting.
-  if (location.href !== bootUrl) return;
-
-  mount(session);
-
   if (hit) {
-    setCards(renderSuggestions(JSON.parse(hit)));
+    // Cached: 600ms page-settle, then reveal panel with data already inside — no spinner.
+    await new Promise(r => setTimeout(r, 600));
+    if (location.href !== bootUrl) return;
+    mount(session, renderSuggestions(JSON.parse(hit)));
   } else {
-    const resp = await earlyFetch;
-    if (resp.ok) {
-      sessionStorage.setItem(key, JSON.stringify(resp.data));
-      setCards(renderSuggestions(resp.data));
-    } else {
-      setCards(renderError(resp.error));
-    }
+    // Fresh fetch: fire request while the user reads their page.
+    // Panel stays hidden until data is ready — the "ta-da" moment.
+    // Promise.all ensures a minimum 600ms settle time even if AI responds faster.
+    const fetchPromise = chrome.runtime.sendMessage({ type: 'FETCH_SUGGESTIONS', payload: fetchPayload() })
+      .catch(err => ({ ok: false, error: err?.message || 'Request failed' }));
+
+    const [, resp] = await Promise.all([
+      new Promise(r => setTimeout(r, 600)),
+      fetchPromise,
+    ]);
+
+    // Abort if user navigated away while waiting for AI
+    if (location.href !== bootUrl) return;
+
+    const initialCards = resp.ok
+      ? (sessionStorage.setItem(key, JSON.stringify(resp.data)), renderSuggestions(resp.data))
+      : renderError(resp.error);
+
+    mount(session, initialCards);
   }
 }
 

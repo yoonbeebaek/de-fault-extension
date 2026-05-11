@@ -659,12 +659,10 @@ function buildStyles(color) {
       min-height: 0;
       padding: 14px 20px 24px;
     }
+    .df-scroll { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.30) transparent; }
     .df-scroll::-webkit-scrollbar { width: 3px; }
     .df-scroll::-webkit-scrollbar-track { background: transparent; }
-    .df-scroll::-webkit-scrollbar-thumb {
-      background: rgba(255,255,255,0.28);
-      border-radius: 2px;
-    }
+    .df-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.30); border-radius: 2px; }
 
     /* ── Cards column inside scroll ── */
     .cards {

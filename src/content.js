@@ -1205,6 +1205,9 @@ function isContextTriggerable(context, intent) {
   if (!context || context.length < 10) return false;
   // For open-ended discovery, avoid firing on single generic words like "Home"
   if (intent === "I'm open to discovery" && context.length < 15) return false;
+  // Block platform-name-only contexts — Gemini has nothing to work with and defaults
+  // to moralizing about the platform itself (e.g. "influencer culture harm").
+  if (/^(instagram|facebook|twitter|tiktok|youtube|linkedin|reddit|snapchat|pinterest|threads)[\s.!?,]*$/i.test(context.trim())) return false;
   return true;
 }
 

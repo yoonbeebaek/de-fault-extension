@@ -500,6 +500,11 @@ const ICON_SHRINK = `<svg width="15" height="15" viewBox="0 0 15 15" fill="curre
   <path d="M7.5 0a7.5 7.5 0 110 15 7.5 7.5 0 010-15zM4.17 6.9a.6.6 0 100 1.2h6.66a.6.6 0 100-1.2z"/>
 </svg>`;
 
+// Power-off toggle — disable De.fault on this page
+const ICON_TOGGLE = `<svg width="15" height="15" viewBox="0 0 15 15" fill="currentColor">
+  <path d="M7.5 0a7.5 7.5 0 110 15A7.5 7.5 0 017.5 0zm0 1.2a6.3 6.3 0 100 12.6A6.3 6.3 0 007.5 1.2zM7.5 3a.6.6 0 01.6.6v3.9a.6.6 0 01-1.2 0V3.6A.6.6 0 017.5 3zm-2.6 1.4a.6.6 0 01.1.84 3.6 3.6 0 104.98 0 .6.6 0 11.94-.74 4.8 4.8 0 11-6.84 0 .6.6 0 01.84-.1z"/>
+</svg>`;
+
 // Save — empty placeholder; actual icon swapped via CSS background-image in buildStyles()
 const ICON_SAVE = ``;
 
@@ -1033,26 +1038,78 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
 });
 
+// ─── User-disable toggle ───────────────────────────────────────
+const SK_DISABLED = 'df:user-disabled';
+function isUserDisabled() { return sessionStorage.getItem(SK_DISABLED) === '1'; }
+function setUserDisabled(val) {
+  if (val) sessionStorage.setItem(SK_DISABLED, '1');
+  else sessionStorage.removeItem(SK_DISABLED);
+}
+
+function _fabTooltipStyles(ext) {
+  return `
+    .wrap { position: relative; display: inline-block; }
+    .btn {
+      width:44px; height:44px; display:block;
+      background: url("${ext}Floating_inactivated.png") no-repeat center / 44px 44px;
+      border:none; padding:0;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.15); border-radius:50%;
+    }
+    .tip {
+      position:absolute; bottom:52px; right:0;
+      background:rgba(20,20,20,0.92); color:#fff;
+      font-family:system-ui,sans-serif; font-size:11px; line-height:1.5;
+      padding:7px 11px; border-radius:6px; white-space:nowrap;
+      pointer-events:none; opacity:0;
+      transition:opacity 140ms ease; z-index:1;
+    }
+    .wrap:hover .tip { opacity:1; }
+  `;
+}
+
 function mountInactiveFAB() {
   if (inactiveHost || host) return;
   inactiveHost = document.createElement('div');
   inactiveHost.id = 'de-fault-inactive';
   inactiveHost.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:2147483647;';
-  const sh = inactiveHost.attachShadow({ mode: 'open' });
+  const sh  = inactiveHost.attachShadow({ mode: 'open' });
   const ext = chrome.runtime.getURL('icons/');
   sh.innerHTML = `
     <style>
-      .df-fab-off {
-        width:44px; height:44px;
-        background: url("${ext}Floating_inactivated.png") no-repeat center / 44px 44px;
-        border:none; padding:0; display:block; cursor:default;
-        opacity: 1;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.15);
-        border-radius: 50%;
-      }
+      ${_fabTooltipStyles(ext)}
+      .btn { cursor:default; opacity:0.5; }
     </style>
-    <button class="df-fab-off" title="De.fault"></button>
+    <div class="wrap">
+      <button class="btn" aria-label="De.fault"></button>
+      <div class="tip">De.fault을 이 페이지에서<br>활성화할 수 없습니다.</div>
+    </div>
   `;
+  document.documentElement.appendChild(inactiveHost);
+}
+
+function mountDisabledFAB() {
+  if (inactiveHost || host) return;
+  inactiveHost = document.createElement('div');
+  inactiveHost.id = 'de-fault-inactive';
+  inactiveHost.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:2147483647;';
+  const sh  = inactiveHost.attachShadow({ mode: 'open' });
+  const ext = chrome.runtime.getURL('icons/');
+  sh.innerHTML = `
+    <style>
+      ${_fabTooltipStyles(ext)}
+      .btn { cursor:pointer; opacity:0.6; transition:opacity 140ms ease; }
+      .btn:hover { opacity:0.85; }
+    </style>
+    <div class="wrap">
+      <button class="btn" aria-label="De.fault — disabled"></button>
+      <div class="tip">De.fault이 비활성화되어 있습니다.<br>클릭하여 다시 활성화하세요.</div>
+    </div>
+  `;
+  sh.querySelector('.btn').addEventListener('click', () => {
+    setUserDisabled(false);
+    inactiveHost.remove(); inactiveHost = null;
+    boot();
+  });
   document.documentElement.appendChild(inactiveHost);
 }
 
@@ -1075,6 +1132,7 @@ function mount(session, initialCards = '') {
 
     <div class="popup" id="popup">
       <div class="controls">
+        <button class="btn-ctrl" id="btnToggle" title="Disable De.fault on this page">${ICON_TOGGLE}</button>
         <button class="btn-ctrl" id="btnShrink" title="Minimize">${ICON_SHRINK}</button>
         <button class="btn-ctrl" id="btnClose"  title="Close">${ICON_CLOSE}</button>
       </div>
@@ -1106,6 +1164,13 @@ function mount(session, initialCards = '') {
   }, true);
 
   const $ = (id) => shadow.getElementById(id);
+
+  $('btnToggle').addEventListener('click', () => {
+    setUserDisabled(true);
+    _dfActive = false;
+    host.remove(); host = null; shadow = null;
+    mountDisabledFAB();
+  });
 
   $('btnShrink').addEventListener('click', () => {
     $('popup').style.display = 'none';
@@ -1263,6 +1328,9 @@ async function boot() {
 
   const intent = detectIntent(pageCtx.context);
   if (!isContextTriggerable(pageCtx.context, intent)) { mountInactiveFAB(); return; }
+
+  // Page is activatable — but user may have toggled De.fault off this session
+  if (isUserDisabled()) { mountDisabledFAB(); return; }
 
   const session = initSession(intent);
   appState = {

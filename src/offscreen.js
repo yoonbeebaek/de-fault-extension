@@ -100,7 +100,9 @@ async function warmup() {
 
 // ─── Main AI call ──────────────────────────────────────────────
 
-async function runAI({ context, intent, contentTypeDesc, disciplineKey, disciplineDesc }) {
+const PLATFORM_NAMES = { instagram: 'Instagram', tiktok: 'TikTok', x: 'X (Twitter)' };
+
+async function runAI({ context, intent, contentTypeDesc, disciplineKey, disciplineDesc, socialPlatform }) {
   const lm = await getLM();
 
   if (!lm) {
@@ -141,18 +143,27 @@ async function runAI({ context, intent, contentTypeDesc, disciplineKey, discipli
 
   let text;
   try {
+    const platformName = socialPlatform ? PLATFORM_NAMES[socialPlatform] : null;
+    const slot1 = platformName
+      ? `Slot 1 "Same World": a ${platformName} account, creator, or community whose work takes this topic somewhere completely unexpected — same platform, totally different universe. type=SOCIAL.`
+      : `Slot 1 "Deep Dive": a weighty essay, long-read, or research piece that goes to the root. type=ARTICLE.`;
+    const slot3 = platformName
+      ? `Slot 3 "Visual Proof": a video essay, short documentary, or visual explainer that makes the concept visceral to watch. type=VIDEO.`
+      : `Slot 3 "Raw POV": an unfiltered community take — a Reddit thread, Substack essay, or social debate. type=SOCIAL.`;
+    const template = platformName
+      ? `[{"title":"...","source":"...","type":"SOCIAL","query":"..."},{"title":"...","source":"...","type":"ARTICLE","query":"..."},{"title":"...","source":"...","type":"VIDEO","query":"..."}]`
+      : `[{"title":"...","source":"...","type":"ARTICLE","query":"..."},{"title":"...","source":"...","type":"VIDEO","query":"..."},{"title":"...","source":"...","type":"SOCIAL","query":"..."}]`;
+
     text = await session.prompt(
       `Lens: ${disciplineKey} — ${disciplineDesc}\n` +
       `Topic: "${context}". Intent: "${intent}". Angle: ${contentTypeDesc}\n\n` +
       `Fill 3 editorial slots. Each slot has a fixed role — pick content that best serves it:\n` +
-      `Slot 1 "Deep Dive": a weighty essay, long-read, or research piece that goes to the root. type=ARTICLE.\n` +
-      `Slot 2 "Visual Proof": a video essay, short documentary, or visual explainer — something that makes the concept visceral to watch. type=VIDEO.\n` +
-      `Slot 3 "Raw POV": an unfiltered community take — a Reddit thread, Substack essay, or social debate that captures how real people react to this. type=SOCIAL.\n` +
+      `${slot1}\n` +
+      `Slot 2 "Deep Dive": a weighty essay, long-read, or research piece that goes to the root. type=ARTICLE.\n` +
+      `${slot3}\n` +
       `'query': 2-3 core nouns only (e.g. "AI consciousness" or "T-Rex growth"). MAXIMUM 3 words. NO long phrases, NO quotes, NO site:.\n` +
       `JSON only — no markdown, no URLs:\n` +
-      `[{"title":"...","source":"...","type":"ARTICLE","query":"..."},` +
-      `{"title":"...","source":"...","type":"VIDEO","query":"..."},` +
-      `{"title":"...","source":"...","type":"SOCIAL","query":"..."}]`,
+      `${template}`,
     );
   } catch (e) {
     _sess = null;

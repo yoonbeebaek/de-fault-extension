@@ -511,6 +511,16 @@ const MEDIUM_ICONS = {
   PRODUCT: `<img src="${_EXT}PRODUCT.png" width="14" height="14" alt="" style="display:block;">`,
 };
 
+const PLATFORM_LABELS = { instagram: 'Instagram', tiktok: 'TikTok', x: 'X' };
+
+function detectSocialPlatform() {
+  const h = location.hostname;
+  if (h.includes('instagram.com')) return 'instagram';
+  if (h.includes('tiktok.com'))    return 'tiktok';
+  if (h.includes('twitter.com') || h.includes('x.com')) return 'x';
+  return null;
+}
+
 // ─── Styles ────────────────────────────────────────────────────
 //
 //  All measurements from Figma spec:
@@ -683,6 +693,25 @@ function buildStyles(color) {
 
     .card-primary   { height: 172px; flex-shrink: 0; }
     .card-secondary { height: 100px; flex-shrink: 0; }
+
+    /* ── Hero card — social platform native (stacked layout) ── */
+    .card-hero { flex-direction: column; height: auto; flex-shrink: 0; }
+    .card-hero .card-thumb {
+      width: 100%; height: 154px;
+      border-radius: 3px 3px 0 0;
+    }
+    .card-hero .card-body { min-height: 68px; }
+    .card-hero .eyebrow   { top: 10px; left: 14px; right: 14px; }
+    .card-hero .card-title-wrap { padding: 30px 14px 14px; }
+    .card-hero .card-title { font-size: 14px; -webkit-line-clamp: 2; }
+    .card-hero .card-thumb-icon img { width: 36px; height: 36px; }
+    .platform-badge {
+      font-weight: 700; font-size: 9px; letter-spacing: 0.06em;
+      text-transform: uppercase; white-space: nowrap;
+      color: rgba(255,255,255,0.90);
+      border: 1px solid rgba(255,255,255,0.35);
+      border-radius: 3px; padding: 1px 5px; line-height: 1.4;
+    }
 
     /* ── Thumbnail panel ── */
     .card-thumb {
@@ -945,25 +974,34 @@ function renderError(message) {
 }
 
 function renderCard(s, isPrimary, idx) {
-  const type  = (s.type || 'ARTICLE').toUpperCase();
-  const micon = MEDIUM_ICONS[type] || MEDIUM_ICONS.ARTICLE;
+  const isHero = !!s.hero;
+  const type   = (s.type || 'ARTICLE').toUpperCase();
+  const micon  = MEDIUM_ICONS[type] || MEDIUM_ICONS.ARTICLE;
   const thumbInner = s.image
     ? `<img class="card-thumb-img"
              src="${esc(s.image)}"
              alt=""
-             loading="${isPrimary ? 'eager' : 'lazy'}">
+             loading="${isPrimary || isHero ? 'eager' : 'lazy'}">
        <div class="card-thumb-icon" style="display:none">${micon}</div>`
     : `<div class="card-thumb-icon">${micon}</div>`;
 
+  const badge = isHero && s.platform
+    ? `<span class="platform-badge">${esc(PLATFORM_LABELS[s.platform] || s.platform)}</span>`
+    : s.raw
+      ? `<span class="raw-badge">Raw POV</span>`
+      : `<span class="type-label">${esc(type)}</span>`;
+
+  const cardClass = isHero
+    ? 'card card-hero'
+    : `card ${isPrimary ? 'card-primary' : 'card-secondary'}`;
+
   return `
-    <div class="card ${isPrimary ? 'card-primary' : 'card-secondary'}" data-url="${esc(cardUrl(s))}" role="link" tabindex="0">
+    <div class="${cardClass}" data-url="${esc(cardUrl(s))}" role="link" tabindex="0">
       <div class="card-thumb">${thumbInner}</div>
       <div class="card-body">
         <div class="eyebrow">
           <span class="medium-icon">${micon}</span>
-          ${s.raw
-            ? `<span class="raw-badge">Raw POV</span>`
-            : `<span class="type-label">${esc(type)}</span>`}
+          ${badge}
           <span class="eyebrow-rule"></span>
           <span class="source-name">${esc(s.source)}</span>
           <button class="btn-save" data-idx="${idx}" title="Save"></button>
@@ -1169,6 +1207,7 @@ function fetchPayload() {
     contentTypeDesc: appState.angle.desc,
     disciplineKey:   appState.discipline.key,
     disciplineDesc:  appState.discipline.desc,
+    socialPlatform:  appState.socialPlatform || null,
   };
 }
 
@@ -1227,12 +1266,13 @@ async function boot() {
 
   const session = initSession(intent);
   appState = {
-    context:    pageCtx.context,
+    context:        pageCtx.context,
     intent,
-    angle:      session.angle,
-    angleIdx:   session.angleIdx,
-    discipline: session.discipline,
-    color:      session.color,
+    angle:          session.angle,
+    angleIdx:       session.angleIdx,
+    discipline:     session.discipline,
+    color:          session.color,
+    socialPlatform: detectSocialPlatform(),
   };
 
   const key = cacheKey();

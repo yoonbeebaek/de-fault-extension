@@ -257,6 +257,12 @@ const DISCIPLINE_DOMAINS = {
 
 // Raw POV — sources with unfiltered community voice (Slot 3)
 const RAW_DOMAINS    = 'site:reddit.com OR site:substack.com OR site:x.com OR site:twitter.com';
+// Social platform native domains — for hero slot on social platform pages
+const PLATFORM_DOMAINS = {
+  instagram: 'site:instagram.com',
+  tiktok:    'site:tiktok.com',
+  x:         'site:x.com OR site:twitter.com',
+};
 // Visual Proof — quality video modifiers to avoid algorithm-polluted content (Slot 2)
 const VIDEO_MODIFIER = '"video essay" OR documentary OR lecture';
 
@@ -273,7 +279,7 @@ async function rssFirstLink(query) {
   } catch { return null; }
 }
 
-async function resolveUrl(s, disciplineKey, cardIndex) {
+async function resolveUrl(s, disciplineKey, cardIndex, platformDomain = null) {
   const type      = (s.type || 'ARTICLE').toUpperCase();
   const title     = s.title  || '';
   const source    = s.source || '';
@@ -282,6 +288,15 @@ async function resolveUrl(s, disciplineKey, cardIndex) {
     || title.split(/\s+/).slice(0, 3).join(' ');
   // Retry budget: strip to first 2 words for the broadest possible RSS hit.
   const shortQuery = baseQuery.split(/\s+/).slice(0, 2).join(' ');
+
+  // Hero slot — platform-native: search within the user's current platform domain.
+  if (type === 'SOCIAL' && cardIndex === 0 && platformDomain) {
+    const hit1 = await rssFirstLink(`(${baseQuery}) ${platformDomain}`);
+    if (hit1) return hit1;
+    const hit2 = await rssFirstLink(`${shortQuery} ${platformDomain}`);
+    if (hit2) return hit2;
+    return null;
+  }
 
   // Slot 2 "Visual Proof": video essays/documentaries on YouTube and TED.
   // Vimeo excluded — RSS returns too few results.
@@ -342,11 +357,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           return;
         }
         if (result.ok && Array.isArray(result.data)) {
-          const disciplineKey = message.payload?.disciplineKey;
+          const disciplineKey  = message.payload?.disciplineKey;
+          const socialPlatform = message.payload?.socialPlatform || null;
+          const platformDomain = socialPlatform ? PLATFORM_DOMAINS[socialPlatform] : null;
           result.data = await Promise.all(
             result.data.map(async (s, i) => {
-              const isRaw = (s.type || '').toUpperCase() === 'SOCIAL';
-              const url   = await resolveUrl(s, disciplineKey, i);
+              const isHero = i === 0 && !!socialPlatform;
+              const isRaw  = !isHero && (s.type || '').toUpperCase() === 'SOCIAL';
+              const url    = await resolveUrl(s, disciplineKey, i, isHero ? platformDomain : null);
               if (!url) return null; // RSS failed all retries — drop this card
               // Single fetch: real page title + og:image from the resolved URL.
               // Title overrides Gemini's invented title so card matches the link.
@@ -356,7 +374,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 url,
                 image,
                 ...(realTitle ? { title: realTitle } : {}),
-                ...(isRaw ? { raw: true } : {}),
+                ...(isHero ? { hero: true, platform: socialPlatform } : {}),
+                ...(isRaw  ? { raw: true } : {}),
               };
             })
           );

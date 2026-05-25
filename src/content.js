@@ -508,12 +508,13 @@ const ICON_TOGGLE = `<svg width="15" height="15" viewBox="0 0 15 15" fill="curre
 // Save — empty placeholder; actual icon swapped via CSS background-image in buildStyles()
 const ICON_SAVE = ``;
 
-// Content-type badges — user's uploaded PNGs
+// Content-type badges — inline SVGs (CSP-immune: no external URLs needed)
 const MEDIUM_ICONS = {
-  ARTICLE: `<img src="${_EXT}ARTICLE.png" width="14" height="14" alt="" style="display:block;">`,
-  VIDEO:   `<img src="${_EXT}VIDEO.png"   width="14" height="14" alt="" style="display:block;">`,
-  AUDIO:   `<img src="${_EXT}AUDIO.png"   width="14" height="14" alt="" style="display:block;">`,
-  PRODUCT: `<img src="${_EXT}PRODUCT.png" width="14" height="14" alt="" style="display:block;">`,
+  ARTICLE: `<svg class="type-icon" width="14" height="14" viewBox="0 0 14 14" fill="rgba(255,255,255,0.65)" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2.5" width="10" height="1.5" rx=".5"/><rect x="2" y="5.5" width="8" height="1.5" rx=".5"/><rect x="2" y="8.5" width="6" height="1.5" rx=".5"/></svg>`,
+  VIDEO:   `<svg class="type-icon" width="14" height="14" viewBox="0 0 14 14" fill="rgba(255,255,255,0.65)" xmlns="http://www.w3.org/2000/svg"><path d="M3.5 2.5l8 4.5-8 4.5z"/></svg>`,
+  AUDIO:   `<svg class="type-icon" width="14" height="14" viewBox="0 0 14 14" fill="rgba(255,255,255,0.65)" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="5" width="2" height="4" rx="1"/><rect x="4" y="3" width="2" height="8" rx="1"/><rect x="7" y="4" width="2" height="6" rx="1"/><rect x="10" y="5" width="2" height="4" rx="1"/></svg>`,
+  PRODUCT: `<svg class="type-icon" width="14" height="14" viewBox="0 0 14 14" fill="rgba(255,255,255,0.65)" xmlns="http://www.w3.org/2000/svg"><path d="M7 1L1 4.5v5L7 13l6-3.5v-5L7 1zm0 2.2l3.8 2.2L7 7.6 3.2 5.4 7 3.2z"/></svg>`,
+  SOCIAL:  `<svg class="type-icon" width="14" height="14" viewBox="0 0 14 14" fill="rgba(255,255,255,0.65)" xmlns="http://www.w3.org/2000/svg"><path d="M2 1h10a1 1 0 011 1v6a1 1 0 01-1 1H8l-3 2.5V9H2a1 1 0 01-1-1V2a1 1 0 011-1z"/></svg>`,
 };
 
 const PLATFORM_LABELS = { instagram: 'Instagram', tiktok: 'TikTok', x: 'X' };
@@ -640,24 +641,22 @@ function buildStyles(color) {
       box-shadow: 0 1px 3px rgba(0,0,0,0.40);
     }
 
-    /* Refresh button — PNG is the full 44×44 appearance */
+    /* Refresh button — inline SVG (CSP-immune) */
     .btn-refresh {
       width: 44px;
       height: 44px;
       background: none;
       border: none;
       cursor: pointer;
-      position: relative;
       flex-shrink: 0;
       padding: 0;
+      color: rgba(255,255,255,0.55);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 120ms ease;
     }
-    .btn-refresh::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: url("${_EXT}Redo_Default.png") no-repeat center / contain;
-    }
-    .btn-refresh:hover::after { background-image: url("${_EXT}Redo_Hover.png"); }
+    .btn-refresh:hover { color: rgba(255,255,255,0.95); }
     .btn-refresh:active { transform: scale(0.94); }
     @keyframes df-spin {
       from { transform: rotate(0deg); }
@@ -709,7 +708,7 @@ function buildStyles(color) {
     .card-hero .eyebrow   { top: 10px; left: 14px; right: 14px; }
     .card-hero .card-title-wrap { padding: 30px 14px 14px; }
     .card-hero .card-title { font-size: 14px; -webkit-line-clamp: 2; }
-    .card-hero .card-thumb-icon img { width: 36px; height: 36px; }
+    .card-hero .card-thumb-icon .type-icon { width: 36px; height: 36px; }
     .platform-badge {
       font-weight: 700; font-size: 9px; letter-spacing: 0.06em;
       text-transform: uppercase; white-space: nowrap;
@@ -749,8 +748,8 @@ function buildStyles(color) {
       justify-content: center;
       opacity: 0.40;
     }
-    .card-primary   .card-thumb-icon img { width: 44px; height: 44px; }
-    .card-secondary .card-thumb-icon img { width: 26px; height: 26px; }
+    .card-primary   .card-thumb-icon .type-icon { width: 44px; height: 44px; }
+    .card-secondary .card-thumb-icon .type-icon { width: 26px; height: 26px; }
 
     .card-body {
       flex: 1;
@@ -1138,7 +1137,12 @@ function mount(session, initialCards = '') {
       </div>
       <div class="header">
         <h1 class="headline" id="headline">${esc(session.headline)}</h1>
-        <button class="btn-refresh" id="btnRefresh" title="New angle"></button>
+        <button class="btn-refresh" id="btnRefresh" title="New angle">
+          <svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M21 13a8 8 0 11-2.1-5.4L21 10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M21 6.5v4.5h-4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
       </div>
       <div class="df-bar"></div>
       <div class="df-scroll">

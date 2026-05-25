@@ -194,6 +194,30 @@ async function getClearbitLogo(url) {
 async function fetchPageMeta(url, fallbackTitle = '') {
   if (!url) return { title: null, image: null };
 
+  // YouTube: oEmbed API returns exact video title + reliable thumbnail.
+  // Service workers can't fetch youtube.com pages (CORS/anti-bot), so
+  // without this the card title stays as Gemini's hallucinated title while
+  // the URL points to a completely different real video.
+  if (/youtube\.com\/watch|youtu\.be\//i.test(url)) {
+    try {
+      const resp = await timedFetch(
+        `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`,
+        5000
+      );
+      if (resp.ok) {
+        const data = await resp.json();
+        const vidId = url.match(/[?&]v=([^&\s]{6,})/)?.[1]
+                   || url.match(/youtu\.be\/([^?&\s]{6,})/)?.[1];
+        // hqdefault always exists; maxresdefault may 404 on older videos
+        const image = vidId
+          ? `https://i.ytimg.com/vi/${vidId}/hqdefault.jpg`
+          : data.thumbnail_url || null;
+        return { title: data.title || null, image };
+      }
+    } catch {}
+    return { title: null, image: null };
+  }
+
   const isGoogleUrl = /news\.google\.com/i.test(url)
                    || /google\.com\/search/i.test(url)
                    || /youtube\.com\/(results|search)/i.test(url);

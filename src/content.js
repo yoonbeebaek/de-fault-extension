@@ -1081,7 +1081,7 @@ function mountInactiveFAB() {
     </style>
     <div class="wrap">
       <button class="btn" aria-label="De.fault"></button>
-      <div class="tip">De.fault을 이 페이지에서<br>활성화할 수 없습니다.</div>
+      <div class="tip">De.fault is not available<br>on this page type.</div>
     </div>
   `;
   document.documentElement.appendChild(inactiveHost);
@@ -1102,7 +1102,7 @@ function mountDisabledFAB() {
     </style>
     <div class="wrap">
       <button class="btn" aria-label="De.fault — disabled"></button>
-      <div class="tip">De.fault이 비활성화되어 있습니다.<br>클릭하여 다시 활성화하세요.</div>
+      <div class="tip">De.fault is disabled on this page.<br>Click to re-enable.</div>
     </div>
   `;
   sh.querySelector('.btn').addEventListener('click', () => {
